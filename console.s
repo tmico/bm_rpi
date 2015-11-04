@@ -43,7 +43,7 @@ _X2:
 	rev r10, r10				@ rev; revers byte order in Rm
 	mov r8, $0x04				@ 1/4 font y counter
 
-_XL:
+_XL:	@ Decided againt a loop to boost speed of execution. saves aprox 750 cycles per glyph
 	movs r10, r10, lsl #1			@ tst if bit falls off	
 	addcs r0, r6, $0x00
 	movcs r1, r7
@@ -102,56 +102,104 @@ _X3:
 	ldmfd sp!, {r4-r11, pc}			@ exit
 
 
-	/* large fonts rarly used /
-_Editundo24:
-	movne r2, r3, lsl #5
-	addne r0, r2, r3, lsl #4		@ mul by 0x30 to get glyph
-	add r11, r11, r0			@ glyph addr 
 
-_L4:	
-	ldrh r9, [r11], $0x02			@ ldr row
-	and r0, r9, $0xff			@ swapping lower bytes round
-	mov r9, r9, lsr #8			@  due to endianess
-	orr r9, r9, r0, lsl #8
-	mov r8, r5				@ cp width for counter
-	mov r10, r6				@ cp x position
-	mov r9, r9, lsl #16
-
-_xloop:
-	movs r9, r9, lsl #1			@ tst if bit falls off	
-	movcs r0, r10
-	movcs r1, r7
-	blcs _set_pixel
-	add r10, r10, $0x01
-	subs r8, r8, $0x01
-	bne _xloop
-
-_yloop:
-	subs r4, r4, $0x01			@ font height counter
-	addne r7, r7, $0x01			@ incr y to next row
+	/* binary to hex in assci converter. (uses BinHex lookup table)
+	 * Returns ascii coded value in r0-r1 (lsbyte in lsreg)	As such
+	 * it can return a max value of 0xFFFFFFFF which should be enough
+	 * as the pi is a 32bit system there is nothing to be gained from
+	 * from any higher value. value passed from r0 */
+_bin_hex:
+	stmfd sp!, {r8-r11}
+	ldr r11, =BinHex
+	mov r12, r0				@ copy to work from
+	mov r3, $0xff000000			@ masking bits
+_BH0:
+	eor r1, r1
+	mov r8, $24
+	and r10, r12, r3
+	ldrb r9, [r11, r10]
+	orr r1, r1, r9, lsl r8
+	subs r8, r8, $0x08
+	movmi r0, r1
+	movs r3, r3, lsr #4
+	bcc _BH0
+	ldmfd sp!, {r8-r11}
 	
-	bne _L4					@ next row
-
-_L5:
-	pop {r2, r4-r12}
-	add r6, r6, r5
-	strd r6, r7, [r10]			@ update CursorLoc
-
-	subs r2, r2, $0x01			@ next char or exit
-	bne _L1
-
-	cmp r8, $0x00
-	bne _B0 
-	ldmfd sp!, {r4-r11, pc}			@ exit
-
-	/* 1st 0x1f charactor have no glyphs but do have funtions. Bellow 
-	 * only CR, Tab, Delete are being delt with for time being
-	 */
-
-_special_char:
-
+	
 	.data
 	.align 2
 	.global SystemFont
 SystemFont:
 	.word	_u_vga16
+
+
+BinHex:
+	.byte '0', '1', '2', '3'
+	.byte '4', '5', '6', '7'
+	.byte '8', '9', 'A', 'B'
+	.byte 'C', 'D', 'E', 'F'
+
+EditUndo16:
+	.incbin		"editundo.adapt16.psf"	@ Fonts created by Brian kent
+						@  in psf format (bitmap) with
+						@  the unicode table stripped
+	
+Uvga16:
+	.incbin		"u_vga16.psf"
+
+
+	.global CursorLoc			@ Cursor location stored in mem
+CursorLoc:
+	.word 0x10				@ x coordinate
+	.word 0x10				@ y coordinate
+	
+	.global ScreenWidth
+	.global CursorPos
+
+ScreenWidth:	
+	.word 0x74				@ 116 char wide based 
+						@  on font width 11
+CursorPos:
+	.word 0x74
+
+	.global Text1
+	.global Text1lng 
+Text1:
+	.asciz "< Welcome to TMX O1 >"
+	Text1lng = . - Text1
+
+/* Terminal */
+	.align 4
+TerminalStart:
+	.int TerminalBuffer			@ 1st char in buffer
+
+TerminalEnd:
+	.int TerminalBuffer			@ last char in buffer
+
+TerminalView:
+	.int TerminalBuffer			@ 1st char in buffer on screen
+
+TerminalColour:
+	.byte 0x0f
+
+	.align 8
+
+TerminalBuffer:
+	.rept 116 * 45
+	.byte 0x7f
+	.byte 0x00
+	.endr
+
+TerminalScreen:
+	.rept 116 * 90
+	.byte 0x7f
+	.byte 0x00
+	.endr
+/*
+	.align 5
+	.global SceenBuffer
+ScreenBuffer:				@ screen buffer to send to framebuffer
+	.rept 3*1280*720
+	.byte 0x00
+	.endr
+*/

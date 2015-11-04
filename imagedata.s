@@ -7,17 +7,8 @@
 	.section .data
 	.align 2
 	.global FabPic
-	.global SystemFont
 	.global EditUndo16
 	.global Uvga16
-	.global screenx
-	.global screeny
-
-.equ	screenx,	0x500
-
-.equ	screeny,	0x2d0
-
-
 
 FabPic:						@ picture by fabienne micoud
 	.incbin		"fabs.bmp"
@@ -42,61 +33,3 @@ FabPic:						@ picture by fabienne micoud
  *	PSF2_STARTSEQ   0xFE
 */
 	
-
-EditUndo16:
-	.incbin		"editundo.adapt16.psf"	@ Fonts created by Brian kent
-						@  in psf format (bitmap) with
-						@  the unicode table stripped
-	
-Uvga16:
-	.incbin		"u_vga16.psf"
-
-
-	.global CursorLoc			@ Cursor location stored in mem
-CursorLoc:
-	.word 0x10				@ x coordinate
-	.word 0x10				@ y coordinate
-	
-	.global ScreenWidth
-	.global CursorPos
-
-ScreenWidth:	
-	.word 0x74				@ 116 char wide based 
-						@  on font width 11
-CursorPos:
-	.word 0x74
-
-
-	.global Text1
-	.global Text1lng 
-Text1:
-	.asciz "< Welcome to A4E O1 >"
-	Text1lng = . - Text1
-
-/* Terminal */
-	.align 4
-TerminalStart:
-	.int TerminalBuffer			@ 1st char in buffer
-
-TerminalEnd:
-	.int TerminalBuffer			@ last char in buffer
-
-TerminalView:
-	.int TerminalBuffer			@ 1st char in buffer on screen
-
-TerminalColour:
-	.byte 0x0f
-
-	.align 8
-
-TerminalBuffer:
-	.rept 80 * 80				
-	.byte 0x7f
-	.byte 0x00
-	.endr
-
-TerminalScreen:
-	.rept 80 * 30
-	.byte 0x7f
-	.byte 0x00
-	.endr

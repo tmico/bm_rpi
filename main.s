@@ -22,14 +22,14 @@ _reset:
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0x4200			@ set its stack pointer
+	mov sp, $0xf200			@ set its stack pointer
 
 	mov r0, $0x12			@ Enter IRQ mode
 	msr cpsr, r0			@ ensure irq and fiq are disabled
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0x4000			@ set its stack pointer
+	mov sp, $0xf000			@ set its stack pointer
 	
 	
 	mov r0, $0x13			@ Enter SWI mode
@@ -37,14 +37,14 @@ _reset:
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0x4300			@ set its stack pointer
+	mov sp, $0xf300			@ set its stack pointer
 
 	mov r0, $0x17			@ Enter ABORT mode
 	msr cpsr, r0			@ ensure irq and fiq are disabled
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0x4400			@ set its stack pointer
+	mov sp, $0xf400			@ set its stack pointer
 
 
 	mov r0, $0x1b			@ Enter UNDEFINED mode
@@ -52,7 +52,7 @@ _reset:
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0x4500			@ set its stack pointer
+	mov sp, $0xf500			@ set its stack pointer
 
 	mov r0, $0x10
 	msr cpsr, r0			@ User mode | fiq/irq enabled
@@ -88,8 +88,8 @@ _main:
 	 * Otherwise r0 is virtual width, r1 virtual height and r2 is colour 
 	 * depth  */
 
-	ldr r0, =screenx			@ 1280
-	ldr r1, =screeny			@ 720
+	mov r0, $1280				@ 1280
+	mov r1, $720				@ 720
 	mov r2, $24
 	bl _init_framebuffer
 	teq r0, $0				@ zero returned = error
@@ -117,46 +117,6 @@ _init_arm_timer:
 	/* display on screen Fabienne's picture. An intact bmp assembled into
 	 * memory in imagedata.s file with the 1st 2bytes stripped to make
 	 * restof header word aligned	*/
- _display_pic:
-	ldr r10, = FabPic
-	ldrd r8, r9, [r10, $0x10]		@ 0x10 - offset that holds
-						@  width and height
-	mov r0, $0x500
-	mov r1, $0x2d0
-
-	rsb r6, r8, r0
-	mov r6, r6, lsr $1			@ starting pixel location to
-	rsb r7, r9, r1				@  display pic centre screen
-	mov r7, r7, lsr $1			@  r6 - width, r7 - height
-	add r7, r7, r9				@ bmp pics are bottom up
-	ldr r11, [r10, $0x08]			@ offset that holds bitmap
-						@  data offset.
-	add r10, r10, r11			@ r10 holds start of pic loc
-	add r8, r8, $1
-	mov r12, r8				@ copy for counter of width
-	mov r11, r6				@ copy starting point of width
-_Lpic:
-	ldrb r4, [r10], $1			@ easyier to ldr bytes with
-	mov r0, r4				@  non word aligned data
-	ldrb r4, [r10], $1
-	orr r0, r4, lsl $8
-	ldrb r4, [r10], $1
-	orr r0, r4, lsl $16
-	bl _fg_colour
-	mov r0, r6				@ r6 and r7 are coordinates
-	mov r1, r7
-	bl _set_pixel
-
-_Lwidth:
-	subs r8, r8, $1				@ counter based on width
-	addne r6, r6, $1
-	moveq r6, r11				@ reset starting width if == 0
-	moveq r8, r12
-	subeq r7, $1
-	subeqs r9, r9, $1			@ counter for height. if == 0
-						@  then pic displayed
-	bne _Lpic
-
 
 _Bloop:						
 	b _Bloop	@ Catch all loop
