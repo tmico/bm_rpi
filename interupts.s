@@ -122,6 +122,11 @@ _arm_timer_interupt:
 	str r1, [r11]
 	mov r0, $16
 	bl _set_gpio
+
+	ldr r0, =SysTimer
+	ldr r1, [r0]
+	add r1, r1, $0x01
+	str r1, [r0]
 	pop {r0-r1, pc}
 .data
 .align 2

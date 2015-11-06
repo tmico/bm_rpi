@@ -7,8 +7,6 @@
 	.section .data
 	.align 2
 	.global FabPic
-	.global EditUndo16
-	.global Uvga16
 
 FabPic:						@ picture by fabienne micoud
 	.incbin		"fabs.bmp"

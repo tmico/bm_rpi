@@ -61,7 +61,7 @@ _get_graphics_adr:
 
 	.global _set_pixel
 _set_pixel:
-	stmfd sp!, {r4-r6, lr}			@ push
+	stmfd sp!, {r4-r5, lr}			@ push
 	ldr r3, =GraphicsAdr			@ check that x and y are valid
 	ldr r2, [r3]
 	ldrd r4, r5, [r2, #8]			@ virt values of width, hieght
@@ -81,7 +81,7 @@ _set_pixel:
 	mov r2, r2, lsr #8			@ mov red values to lsb
 	strb r2, [r0]				@ red channel
 
-	ldmfd sp!, {r4-r6, pc}			@ pop and exit
+	ldmfd sp!, {r4-r5, pc}			@ pop and exit
 
 	.global _set_pixel16
 _set_pixel16:

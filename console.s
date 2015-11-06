@@ -195,11 +195,9 @@ TerminalScreen:
 	.byte 0x7f
 	.byte 0x00
 	.endr
-/*
-	.align 5
+
+	.align 2
 	.global SceenBuffer
 ScreenBuffer:				@ screen buffer to send to framebuffer
-	.rept 3*1280*720
-	.byte 0x00
-	.endr
-*/
+	.skip 3*1280*720
+

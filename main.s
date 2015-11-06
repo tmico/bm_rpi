@@ -22,14 +22,14 @@ _reset:
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0xf200			@ set its stack pointer
+	mov sp, $0xf20000		@ set its stack pointer
 
 	mov r0, $0x12			@ Enter IRQ mode
 	msr cpsr, r0			@ ensure irq and fiq are disabled
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0xf000			@ set its stack pointer
+	mov sp, $0xf00000		@ set its stack pointer
 	
 	
 	mov r0, $0x13			@ Enter SWI mode
@@ -37,14 +37,14 @@ _reset:
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0xf300			@ set its stack pointer
+	mov sp, $0xf30000		@ set its stack pointer
 
 	mov r0, $0x17			@ Enter ABORT mode
 	msr cpsr, r0			@ ensure irq and fiq are disabled
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0xf400			@ set its stack pointer
+	mov sp, $0xf40000		@ set its stack pointer
 
 
 	mov r0, $0x1b			@ Enter UNDEFINED mode
@@ -52,11 +52,11 @@ _reset:
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0xf500			@ set its stack pointer
+	mov sp, $0xf50000		@ set its stack pointer
 
 	mov r0, $0x10
 	msr cpsr, r0			@ User mode | fiq/irq enabled
-	mov sp, $0x8000
+	mov sp, $0xf00000
 	
 	/*	Enable various interupts	*/
 	mov r0, $0x20000000		@ Base address
@@ -117,6 +117,9 @@ _init_arm_timer:
 	/* display on screen Fabienne's picture. An intact bmp assembled into
 	 * memory in imagedata.s file with the 1st 2bytes stripped to make
 	 * restof header word aligned	*/
+	
+	/* Display Fabienns picture */
+	bl _display_pic
 
 _Bloop:						
 	b _Bloop	@ Catch all loop
@@ -129,18 +132,9 @@ _error$:
 	mov r1, $0				@ turn off pin to turn on led
 	bl _set_gpio
 	b _Bloop
-/***************************************************************************
- *  Code used but no longer wanted that i've not brought myself to delete  *
-_snow:
-	mov r0, $360
-	bl _random_numgen			@ get y
-	mov r4,	r0				@ preserve y to send
-	mov r0, $640
-	bl _random_numgen			@ get x
-	mov r1, r4				@ restore y
-	bl _set_pixel
-	add r5, r5, $5
-	mov r0, r5
-	bl _fg_colour
-	b _snow
-****************************************************************************/
+
+	.data
+	.align 2
+	.global SysTimer
+SysTimer:
+	.int 0x00

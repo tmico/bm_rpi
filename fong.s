@@ -5,7 +5,7 @@
 	.global _display_pic
 
  _display_pic:
-	ldmfd sp!, {r4 - r11}
+	stmfd sp!, {r4 - r11, lr}
 
 	ldr r10, = FabPic
 	ldrd r8, r9, [r10, $0x10]		@ 0x10 - offset that holds
@@ -23,9 +23,10 @@
 	ldr r11, [r10, $0x08]			@ offset that holds bitmap
 						@  data offset.
 	add r10, r10, r11			@ r10 holds start of pic loc
-	add r8, r8, $1
 	mov r12, r8				@ copy for counter of width
 	mov r11, r6				@ copy starting point of width
+	mov r5, $0x00				@ r5 to be copy of _fg_colour
+						@  to tst against
 _Lpic:
 	ldrb r4, [r10], $1			@ easyier to ldr bytes with
 	mov r0, r4				@  non word aligned data
@@ -33,18 +34,23 @@ _Lpic:
 	orr r0, r4, lsl $8
 	ldrb r4, [r10], $1
 	orr r0, r4, lsl $16
-	bl _fg_colour
+	teq r0, r5				@ Only want to branch if diff
+	movne r5, r0				@ preserve new _fg_colour
+	blne _fg_colour				@ set new _fg_colour if new
 	mov r0, r6				@ r6 and r7 are coordinates
 	mov r1, r7
 	bl _set_pixel
 
 _Lwidth:
 	subs r8, r8, $1				@ counter based on width
-	addne r6, r6, $1
-	moveq r6, r11				@ reset starting width if == 0
-	moveq r8, r12
-	subeq r7, $1
-	subeqs r9, r9, $1			@ counter for height. if == 0
+	addpl r6, r6, $1
+	movmi r6, r11				@ reset starting width if == 0
+	movmi r8, r12
+	submi r7, $1
+	submis r9, r9, $1			@ counter for height. if == 0
 						@  then pic displayed
-	bne _Lpic
+	bpl _Lpic
+
+	ldmfd sp!, {r4 - r11, pc}			@ Exit	
+
 

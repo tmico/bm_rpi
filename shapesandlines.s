@@ -42,26 +42,28 @@
 	.global _draw_line
 
 _draw_line:
-	stmfd sp!,  {r0-r12, lr}		@ need to also preserve r0-r3
+	stmfd sp!,  {r4-r12, lr}		@ need to also preserve r0-r3
+	mov r4, r0
+	mov r5, r1
+	mov r6, r2
+	mov r7,	r3
+	subs r10, r2, r0			@ delta_x
+	rsbmi r10, r10, $0x00			@ delta_x needs to be positive
+	mov r8, $0x01				@ inc x value
+	rsbmi r8, r8, $0x00			@ not 0 = -1
 
-	subs r10, r0, r2			@ delta_x
-	rsbmi r10, r10, $0			@ delta_x needs to be positive
-	movpl r8, $1				@ inc x value
-	mvnmi r8, $0				@ not 0 = -1
-
-	subs r11, r1, r3			@ delta_y
-	rsbmi r11, r11, $0
-	movpl r9, $1
-	mvnmi r9, $0
+	subs r11, r3, r1			@ delta_y
+	rsbmi r11, r11, $0x00
+	mov r9, $0x01
+	rsbmi r9, r9, $0x00
 
 	cmp r10, r11				@ assertain the driving axis
 	bmi _y_axis
 
 _x_axis:
-	ldmfd sp!, {r4-r7}			@ mov r0-r3 into r4-r7
 	bl _set_pixel				@ plot x0,y0 found in r0,r1
 	rsb r7, r10, r11, lsl $1		@ r7 = p_k = 2delta_y - delta_x
-	mov r6, r10				@ r6 = 2delta_x for counter
+	mov r6, r10				@ r6 = delta_x for counter
 _x_loop:
 	cmp r7, $0
 	add r7, r7, r11, lsl $1			@ if <0 add 2delta_y; y=y
@@ -77,7 +79,6 @@ _x_loop:
 	ldmfd sp!, {r4-r12, pc}
 
 _y_axis:
-	ldmfd sp!, {r4-r7}			@ mov r0-r3 into r4-r7
 	bl _set_pixel				@ plot x0,y0 found in r0,r1
 	rsb r7, r11, r10, lsl $1		@ r7 = p_k = 2delta_x - delta_y
 	mov r6, r11				@ r6 = 2delta_y for counter
