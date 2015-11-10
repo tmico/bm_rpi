@@ -121,6 +121,16 @@ _init_arm_timer:
 	/* Display Fabienns picture */
 	bl _display_pic
 
+	/* Attempt a dma transfer */
+	ldr r0, =SysTimer
+L1:
+	ldr r1, [r0]
+	cmp r1, $0x0a				@ aprrox 10 sec
+	bcc L1 
+	bl _init_dma0				@ clear screen
+	nop
+	nop
+
 _Bloop:						
 	b _Bloop	@ Catch all loop
 

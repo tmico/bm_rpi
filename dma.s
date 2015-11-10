@@ -73,17 +73,63 @@
 				29:16	YLength	- in 2D mode no of XLengths
 				15:0	XLength - Transfer length in bytes
 
-	[0-14]_STRIDE		31:16	D_Stride 2D mode byte increment at end of each row (YLength
-				15:0	S_Stride 2D mode byte increcment of Source
+	[0-14]_STRIDE		31:16	D_Stride 2D mode byte increment of 
+					Destination at end of each row (YLength
+				15:0	S_Stride 2D mode byte increment of Source
 
 	[0-14]_NEXTCNBK		31:0	Addr of next CB. Stop if 0x00000000
 ******************************************************************************/
 	.text
+	.global _init_dma0
+	/* For time being _init_dma0 is going to tranfer a buffer from mem to 
+	   the gpu. A memory to GPU transfer. SreenBuffer is a buffer of
+	   1 row of pixels acrros the screen. In 24bit mode thats 3,840 (0xf00)
+	   bytes. In this implimentation going to use 2D xlengths of 3,840 bytes
+	   x 720 (n.o rows) ylengths to clear the screen	 */
+_init_dma0:
+	/* DEST_AD */
+	ldr r0, =ConBlk_0
+	ldr r1, =GraphicsAdr
+	ldr r2, [r1]				@ r2 = GPU pointer
+	ldr r3, [r2, #32]
+	str r3, [r0, #8]			@ put it in CB DEST_AD
+	
+	/* SOURCE_AD */
+	ldr r2, =ScreenBuffer
+	str r2, [r0, #4]			@ put SB into SOURCE_AD
+
+	/* TXFR_LEN */
+	mov r3, $0xf00				@ XLength = #3840 bytes
+						@  stride being signed requires
+						@  i stay under 0x8000 
+	mov r2, $0x00200000			@ YLength = #20 loops (shifted)
+	orr r1, r2, r3				@ put TXFR_LEN into CB
+	str r1, [r0, #12]
+
+	/* STRIDE */
+	mov r1, r3, lsl #16			@ only inc Dest
+	str r1, [r0, #16]
+
+	/* CONBLK_ADD */
+	ldr r1, =0x20007000			@ DMA channel 0 addr
+	str r0, [r1, #4]			@ load CB
+
+	/* TI */
+	mov r2, $0x11
+	mov r2, r2, lsl #4
+	add r2, r2, $0x02			@ set bits to 0x033a
+	str r2, [r0]				@ put TI into CB
+
+	/* CS */
+	mov r3, $0x01				@ ACTIVATE
+	str r3, [r1]
+
+	bx lr
 
 	.data
 	.align 5
-	.global ConBlk_1
-ConBlk_1:
+	.global ConBlk_0
+ConBlk_0:
 	.word	0x00	@ TI
 	.word	0x00	@ SOURCE_AD
 	.word	0x00	@ DEST_AD

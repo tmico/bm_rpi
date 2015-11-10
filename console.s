@@ -197,7 +197,7 @@ TerminalScreen:
 	.endr
 
 	.align 2
-	.global SceenBuffer
+	.global ScreenBuffer
 ScreenBuffer:				@ screen buffer to send to framebuffer
-	.skip 3*1280*720
+	.skip 3*1280
 
