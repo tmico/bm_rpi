@@ -85,13 +85,17 @@
 	   the gpu. A memory to GPU transfer. SreenBuffer is a buffer of
 	   1 row of pixels acrros the screen. In 24bit mode thats 3,840 (0xf00)
 	   bytes. In this implimentation going to use 2D xlengths of 3,840 bytes
-	   x 720 (n.o rows) ylengths to clear the screen	 */
+	   x 688 (n.o rows) ylengths to clear the screen except 1st 32 rows
+	   to keep welcome message on screen.		 */
 _init_dma0:
 	/* DEST_AD */
 	ldr r0, =ConBlk_0
 	ldr r1, =GraphicsAdr
 	ldr r2, [r1]				@ r2 = GPU pointer
 	ldr r3, [r2, #32]
+
+	mov r2, $0xf00				@ n.o of bytes per row
+	add r3, r3, r2, lsl #6			@ r2 = 32nd row
 	str r3, [r0, #8]			@ put it in CB DEST_AD
 	
 	/* SOURCE_AD */
@@ -102,22 +106,24 @@ _init_dma0:
 	mov r3, $0xf00				@ XLength = #3840 bytes
 						@  stride being signed requires
 						@  i stay under 0x8000 
-	mov r2, $0x00200000			@ YLength = #20 loops (shifted)
+	mov r2, $0x02b00000			@ YLength = #688 loops (shifted)
 	orr r1, r2, r3				@ put TXFR_LEN into CB
 	str r1, [r0, #12]
 
 	/* STRIDE */
-	mov r1, r3, lsl #16			@ only inc Dest
-	str r1, [r0, #16]
+	rsb r2, r3, $0x00			@ get two's compliment 
+	mvn r3, $0x00				@ mask
+	and r1, r2, r3, lsr #16			@ inc Src is ls16 bits
+	str r1, [r0, #16]			@ dec src to start of SB
 
 	/* CONBLK_ADD */
 	ldr r1, =0x20007000			@ DMA channel 0 addr
 	str r0, [r1, #4]			@ load CB
 
 	/* TI */
-	mov r2, $0x11
+	mov r2, $0x33
 	mov r2, r2, lsl #4
-	add r2, r2, $0x02			@ set bits to 0x033a
+	add r2, r2, $0x0a			@ set bits to 0x033a
 	str r2, [r0]				@ put TI into CB
 
 	/* CS */
