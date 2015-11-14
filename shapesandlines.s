@@ -36,6 +36,7 @@
 	[xi,yi] end point.
 	As it ierates over the algorithm it will call _set_pixel() to display
 	the line as each pixel coordinate is calculated
+	
 */
 
 	.text
@@ -61,7 +62,7 @@ _draw_line:
 	bmi _y_axis
 
 _x_axis:
-	bl _set_pixel				@ plot x0,y0 found in r0,r1
+	blx  r12 				@ plot x0,y0 found in r0,r1
 	rsb r7, r10, r11, lsl $1		@ r7 = p_k = 2delta_y - delta_x
 	mov r6, r10				@ r6 = delta_x for counter
 _x_loop:
@@ -73,13 +74,16 @@ _x_loop:
 	
 	mov r0, r4
 	mov r1, r5
-	bl _set_pixel
+
+	ldmfd sp, {r12}				@ no write back
+	blx r12
 	subs r6, r6, $1				@ delta_x = -1 ; line finished
 	bpl  _x_loop
-	ldmfd sp!, {r4-r12, pc}
+
+	ldmfd sp!, {r4-r11, pc}
 
 _y_axis:
-	bl _set_pixel				@ plot x0,y0 found in r0,r1
+	blx r12 				@ plot x0,y0 found in r0,r1
 	rsb r7, r11, r10, lsl $1		@ r7 = p_k = 2delta_x - delta_y
 	mov r6, r11				@ r6 = 2delta_y for counter
 _y_loop:
@@ -91,7 +95,9 @@ _y_loop:
 	
 	mov r0, r4
 	mov r1, r5
-	bl _set_pixel
+	ldmfd sp, {r12}				@ no write back
+	blx r12
 	subs r6, r6, $1				@ delta_y = -1 ; line finished
 	bpl  _y_loop
+
 	ldmfd sp!, {r4-r12, pc}

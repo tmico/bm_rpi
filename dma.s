@@ -95,7 +95,7 @@ _init_dma0:
 	ldr r3, [r2, #32]
 
 	mov r2, $0xf00				@ n.o of bytes per row
-	add r3, r3, r2, lsl #6			@ r2 = 32nd row
+	add r3, r3, r2, lsl #5			@ r2 = 32nd row
 	str r3, [r0, #8]			@ put it in CB DEST_AD
 	
 	/* SOURCE_AD */

@@ -67,7 +67,7 @@ _set_pixel:
 	ldrd r4, r5, [r2, #8]			@ virt values of width, hieght
 	cmp r0, r4				@  to cmp against
 	cmpls r1, r5
-	bxhi lr
+	ldmhifd sp!, {r4-r5, pc}		@ pop and exit if out of range
 
 	mla r3, r1, r4, r0			@ y * width + x
 	ldr r0, [r2, #32]			@ GPU pointer

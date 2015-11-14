@@ -114,22 +114,32 @@ _init_arm_timer:
 	ldr r2, =Text1lng	
 	bl _print_buffer
 
-	/* display on screen Fabienne's picture. An intact bmp assembled into
-	 * memory in imagedata.s file with the 1st 2bytes stripped to make
-	 * restof header word aligned	*/
-	
-	/* Display Fabienns picture */
-	bl _display_pic
 
-	/* Attempt a dma transfer */
-	ldr r0, =SysTimer
-L1:
-	ldr r1, [r0]
-	cmp r1, $0x0a				@ aprrox 10 sec
-	bcc L1 
+	/* routine to move around the screen fabienne's pic*/
+_L0:
+	ldr r10, = FabPic
+	ldrd r8, r9, [r10, $0x10]		@ 0x10 - dimentions of pic
+	rsb r6, r8, $0x500			@  to get range for x and y
+	rsb r7, r9, $0x2b0			@ 720-32-height = range for y
+
+	ldr r10, =Stack2
+	ldrd r0, r1, [r10]
+	ldrd r2, r3, [r10, #8]
+	ldr r12 _display_pic
+_L1:
+	bl _draw_line
+	/* Attempt a dma transfer to clear screen */
+	ldr r5, =SysTimer
+_1:
+	ldr r12, [r5]
+	cmp r12, $0x0a
+	bmi _1	
 	bl _init_dma0				@ clear screen
-	nop
-	nop
+	eor r12, r12
+	str r12, [r5]
+
+	
+	b _L0
 
 _Bloop:						
 	b _Bloop	@ Catch all loop
@@ -148,3 +158,9 @@ _error$:
 	.global SysTimer
 SysTimer:
 	.int 0x00
+
+Stack2:
+	.word 0x00
+	.word 0x20
+	.word 0xff
+	.word 0xff
