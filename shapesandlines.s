@@ -34,7 +34,7 @@
 /* _draw_line([x,y],[xi,yi]) takes four arguments that are the xy coordinates
 	for the point of origin of the line to its end point. [x,y] start point
 	[xi,yi] end point.
-	As it ierates over the algorithm it will call _set_pixel() to display
+	As it ierates over the algorithm it will call _set_pixel32() to display
 	the line as each pixel coordinate is calculated
 	
 */

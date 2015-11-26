@@ -15,6 +15,9 @@ _fiq_interupt:
 			@ without need to branch.
 	.global _reset
 _reset:
+	/* Enable branch prediction in System Control coprocessor (CP15)
+
+	@ TODO
 	/* Set up the stack pointers for different cpu modes */
 	
 	mov r0, $0x11			@ Enter FIQ mode
@@ -90,7 +93,7 @@ _main:
 
 	mov r0, $1280				@ 1280
 	mov r1, $720				@ 720
-	mov r2, $24
+	mov r2, $32
 	bl _init_framebuffer
 	teq r0, $0				@ zero returned = error
 	beq _error$	
@@ -112,7 +115,7 @@ _init_arm_timer:
 	mov r0, $0x01
 	ldr r1, =Text1
 	ldr r2, =Text1lng	
-	bl _print_buffer
+	bl _print_string
 
 
 	/* routine to move around the screen fabienne's pic*/
@@ -122,24 +125,28 @@ _L0:
 	rsb r6, r8, $0x500			@  to get range for x and y
 	rsb r7, r9, $0x2b0			@ 720-32-height = range for y
 
-	ldr r10, =Stack2
-	ldrd r0, r1, [r10]
-	ldrd r2, r3, [r10, #8]
-	ldr r12 _display_pic
 _L1:
-	bl _draw_line
+	mov r0, r7
+	bl _random_numgen
+	add r4, r0, $0x20
+	mov r0, r6
+	bl _random_numgen
+	mov r1, r4
+
+	bl _display_pic
+
 	/* Attempt a dma transfer to clear screen */
 	ldr r5, =SysTimer
 _1:
 	ldr r12, [r5]
-	cmp r12, $0x0a
+	cmp r12, $0x08
 	bmi _1	
 	bl _init_dma0				@ clear screen
 	eor r12, r12
 	str r12, [r5]
 
 	
-	b _L0
+	b _L1
 
 _Bloop:						
 	b _Bloop	@ Catch all loop

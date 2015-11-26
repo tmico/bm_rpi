@@ -35,15 +35,24 @@
 ============================================================================*/
 
 	.section .data
-.align 2
+	.align 2
 	.global FgColour
 FgColour:
 	.word 0xffffff
 
-.align 2
+	.align 4
 	.global GraphicsAdr
-GraphicsAdr:
-	.word 0x0
+GraphicsAdr:		@ copy of framebuffer_info incase we don't want stdout
+.int 640		@ #0 Physical Width (for my monitor)
+.int 360		@ #4 Physical Hieght
+.int 640		@ #8 eg Virtual Width
+.int 360		@ #12 eg Virtual Hieght
+.int 0			@ #16 GPU Pitch, GPU will fill it. no bytes per row
+.int 24			@ #20 bit depth
+.int 0			@ #24 X offsets (pixils to skip in top left corner)
+.int 0			@ #28 Y
+.int 0			@ #32 GPU Pointer
+.int 0			@ #36 GPU Size
 
 	.section .text
 
@@ -55,15 +64,17 @@ _fg_colour:
 
 	.global _get_graphics_adr
 _get_graphics_adr:
+	stmfd sp!, {r4-r11}			@ push
 	ldr r1, =GraphicsAdr
-	str r0, [r1]				@ mov GPU FB address to here
+	ldmia r0, {r2-r11}			@ mov GPU FB address to here
+	stmia r1, {r2-r11}
+	ldmfd sp!, {r4-r11}
 	bx lr
 
-	.global _set_pixel
-_set_pixel:
+	.global _set_pixel24
+_set_pixel24:
 	stmfd sp!, {r4-r5, lr}			@ push
-	ldr r3, =GraphicsAdr			@ check that x and y are valid
-	ldr r2, [r3]
+	ldr r2, =GraphicsAdr			@ check that x and y are valid
 	ldrd r4, r5, [r2, #8]			@ virt values of width, hieght
 	cmp r0, r4				@  to cmp against
 	cmpls r1, r5
@@ -75,13 +86,31 @@ _set_pixel:
 	add r0, r0, r3				@ GPU base address + offset
 	ldr r1, =FgColour			@  r0 = new mem loc 
 	ldr r2, [r1]	
-	strb r2, [r0, #2]			@ blue chanel
+	strb r2, [r0]				@ red chanel
 	mov r2, r2, lsr #8			@ mov green values to lsb
 	strb r2, [r0, #1]			@ green channel
-	mov r2, r2, lsr #8			@ mov red values to lsb
-	strb r2, [r0]				@ red channel
+	mov r2, r2, lsr #8			@ mov blue values to lsb
+	strb r2, [r0, #2]			@ blue channel
 
 	ldmfd sp!, {r4-r5, pc}			@ pop and exit
+
+	.global _set_pixel32
+_set_pixel32:
+	ldr r12, =GraphicsAdr			@ check that x and y are valid
+	ldrd r2, r3, [r12, #8]			@ virt values of width, hieght
+	cmp r0, r2				@  to cmp against
+	cmpls r1, r3
+	bxhi lr					@ pop and exit if out of range
+
+	mla r3, r1, r2, r0			@ y * width + x
+	ldr r0, [r12, #32]			@ GPU pointer
+	ldr r1, =FgColour			@  r0 = new mem loc 
+	ldr r2, [r1]	
+	add r0, r0, r3, lsl $2			@ x 4 for 32bit + GPU pointer
+	orr r2, r2, $0xff000000			@ set alpha value
+	str r2, [r0]
+
+	bx lr
 
 	.global _set_pixel16
 _set_pixel16:

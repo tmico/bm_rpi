@@ -31,13 +31,13 @@ framebuffer_info:
 _init_framebuffer:
 	/* Check values passed in arguments are valid. If value in R0 given
 		is zero then use defaults above*/
-	push {r4, lr}
+	push {lr}
 	teq r0, $0
-	ldr r4, =framebuffer_info
+	ldr r3, =framebuffer_info
 	blne _Bchk_value
 	
 	/* Adjust for GPU mem adr (0x40000000) and send to mailbox ch1*/
-	add r0, r4, $0x40000000
+	add r0, r3, $0x40000000
 	mov r1, $1
 	bl _mailbox_write
 
@@ -45,21 +45,21 @@ _init_framebuffer:
 	mov r0, $1
 	bl _mailbox_read
 	cmp r0, $0
+	ldreq r0, =framebuffer_info				@ return address if success
 	movne r0, $0
-	moveq r0, r4				@ return address if success
-	pop {r4, pc}
+	pop {pc}
 _Bchk_value:
 	cmp r0, $4096
 	cmpls r1, $4096
 	cmpls r2, $32
 	movhi r0, $0
-	ldmhifd sp!, {r4, pc}
+	ldmhifd sp!, {pc}
 	/* Write to framebuffer (framebuffer_info)*/
-	@@ str r0, [r4]				@ uncomment to use
-	@@ str r1, [r4, #4]
-	str r0, [r4]
-	str r1, [r4, #4]
-	str r0, [r4, #8]			@ virtual
-	str r1, [r4, #12]			@ virtual
-	str r2, [r4, #20]			@ color bit value
+	@@ str r0, [r3]				@ uncomment to use
+	@@ str r1, [r3, #4]
+	str r0, [r3]
+	str r1, [r3, #4]
+	str r0, [r3, #8]			@ virtual
+	str r1, [r3, #12]			@ virtual
+	str r2, [r3, #20]			@ color bit value
 	bx lr					@ return from checking

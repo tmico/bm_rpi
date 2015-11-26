@@ -4,22 +4,26 @@
 
 	.text
 	.align 2
-	.global _print_buffer
-	  
-/* _print_buffer: for decoding the ascii string and selecting
- *	correct font. By default string will be	sent to stdout (screen).
- *
- *	arguments:-
- *			r0	destination output [1 - stdout]
- *			r1	string start addr
- *			r2	number of char
- *
- *	
+	.global _print_string
+	.global _print_buffer 
+
+/* _print_buffer prints the content of TermBuffer within the range of
+ *	TermScreen. TermScreen is what is displayed on screen but is
+ *	itself just two pointers; a first line and last line that is to be 
+ *	printed.
+ *	_print_buffer sends line by line the content of TermBuffer updating
+ *	TermCur (current line), TermStart and TermEnd
 */
+
 _print_buffer:
-	teq r2, $0x00				@ Test for at least 1 char
-	moveq r0, $0x01				@ return error
-	bxeq lr
+	stmfd sp!, {r4 - r8}
+	
+/* _print_string: for decoding the ascii string and selecting
+ *	correct font. By default string will be	sent to stdout (screen).
+ *	_print_buffer passes the address of the start of the string in r1.
+ *	_print string keeps on printing till a '\n' or 0x00 byte is met.
+*/
+_print_string:
 
 	stmfd sp!, {r4-r11, lr}			@ This section loads font to use
 	ldr r12, =SystemFont			@  set in SystemFont. Each font
@@ -28,73 +32,75 @@ _print_buffer:
 
 _u_vga16:
 	mov r5, r1				@ copy string addr
-	ldr r11, =Uvga16
-	add r11, r11, $0x30			@ offset to font data
-	ldr r10, =CursorLoc
-	ldrd r6, r7, [r10]
 	ldrb r3, [r5], $0x01
+	ldr r11, =Uvga16
+	ldr r10, =CursorLoc
+	add r11, r11, $0x30			@ offset to font data
+	ldrd r6, r7, [r10]
 
 _X1:
 	subs r3, r3, $0x20			@ sync ascii no to glyph pos
 	add r4, r11, r3, lsl #4			@ glyph addr
+	ldr r10, [r4], $0x04
 	mov r9, $0x04				@ y counter
 _X2:
-	ldr r10, [r4], $0x04
-	rev r10, r10				@ rev; revers byte order in Rm
 	mov r8, $0x04				@ 1/4 font y counter
+	rev r10, r10				@ rev; revers byte order in Rm
 
 _XL:	@ Decided againt a loop to boost speed of execution. saves aprox 750 cycles per glyph
 	movs r10, r10, lsl #1			@ tst if bit falls off	
 	addcs r0, r6, $0x00
 	movcs r1, r7
-	blcs _set_pixel
+	blcs _set_pixel32
 
 	movs r10, r10, lsl #1			@ tst if bit falls off	
 	addcs r0, r6, $0x01
 	movcs r1, r7
-	blcs _set_pixel
+	blcs _set_pixel32
 
 	movs r10, r10, lsl #1			@ tst if bit falls off	
 	addcs r0, r6, $0x02
 	movcs r1, r7
-	blcs _set_pixel
+	blcs _set_pixel32
 
 	movs r10, r10, lsl #1			@ tst if bit falls off	
 	addcs r0, r6, $0x03
 	movcs r1, r7
-	blcs _set_pixel
+	blcs _set_pixel32
 
 	movs r10, r10, lsl #1			@ tst if bit falls off	
 	addcs r0, r6, $0x04
 	movcs r1, r7
-	blcs _set_pixel
+	blcs _set_pixel32
 
 	movs r10, r10, lsl #1			@ tst if bit falls off	
 	addcs r0, r6, $0x05
 	movcs r1, r7
-	blcs _set_pixel
+	blcs _set_pixel32
 
 	movs r10, r10, lsl #1			@ tst if bit falls off	
 	addcs r0, r6, $0x06
 	movcs r1, r7
-	blcs _set_pixel
+	blcs _set_pixel32
 
 	movs r10, r10, lsl #1			@ tst if bit falls off	
 	addcs r0, r6, $0x07
 	movcs r1, r7
-	blcs _set_pixel
+	blcs _set_pixel32
 _YL:
 	subs r8, r8, $0x01			@ 1/4 font height counter 
 	add r7, r7, $0x01
 	bne _XL
 	subs r9, r9, $0x01			@ reset x	
+	ldrne r10, [r4], $0x04
 	bne _X2					@ next row
 
 _X3:
+	ldrb r3, [r5], $0x01
 	add r6, r6, $0x08			@ new cusor loc
 	sub r7, r7, $0x10
-	ldrb r3, [r5], $0x01
 	teq r3, $0x00
+	teqne r3, $'\n'
 	bne _X1
 	ldr r10, =CursorLoc
 	strd r6, r7, [r10]			@ update CursorLoc
@@ -151,14 +157,11 @@ Uvga16:
 	.global CursorLoc			@ Cursor location stored in mem
 CursorLoc:
 	.word 0x10				@ x coordinate
-	.word 0x10				@ y coordinate
+	.word 0x00				@ y coordinate
 	
 	.global ScreenWidth
 	.global CursorPos
 
-ScreenWidth:	
-	.word 0x74				@ 116 char wide based 
-						@  on font width 11
 CursorPos:
 	.word 0x74
 
@@ -168,38 +171,34 @@ Text1:
 	.asciz "< Welcome to TMX O1 >"
 	Text1lng = . - Text1
 
+	.global ScreenBuffer		@ DMA transfer
+ScreenBuffer:				@ screen buffer to send to framebuffer
+	.rept 0x1400
+	.byte 0x00
+	.endr
+
 /* Terminal */
 	.align 4
-TerminalStart:
-	.int TerminalBuffer			@ 1st char in buffer
+TermStart:
+	.int 0x00				@ 1st line in buffer
 
-TerminalEnd:
-	.int TerminalBuffer			@ last char in buffer
+TermEnd:
+	.int 0x2d				@ 45 lines apart from TerminalStart
 
-TerminalView:
-	.int TerminalBuffer			@ 1st char in buffer on screen
+TermCur:
+	.int 0x00				@ 1st line in buffer on screen
 
-TerminalColour:
-	.byte 0x0f
-
-	.align 8
-
-TerminalBuffer:
-	.rept 116 * 45
-	.byte 0x7f
+TermColour:
 	.byte 0x00
-	.endr
 
-TerminalScreen:
-	.rept 116 * 90
-	.byte 0x7f
-	.byte 0x00
-	.endr
 
-	.align 2
-	.global ScreenBuffer
-ScreenBuffer:				@ screen buffer to send to framebuffer
-	.rept 0xf00
-	.byte 0x00
-	.endr
+TermScreen:
+	.int TermStart
+	.int TermEnd
 
+
+TermBuffer:
+	.rept 160 * 128				@ 160 char by 128 lines. 
+	.byte 0x00				@  128 = 0x80 which simplifies
+	.endr					@  a roll over count 
+ 

@@ -90,11 +90,10 @@
 _init_dma0:
 	/* DEST_AD */
 	ldr r0, =ConBlk_0
-	ldr r1, =GraphicsAdr
-	ldr r2, [r1]				@ r2 = GPU pointer
-	ldr r3, [r2, #32]
+	ldr r2, =GraphicsAdr
+	ldr r3, [r2, #32]			@ r3 = GPU pointer
 
-	mov r2, $0xf00				@ n.o of bytes per row
+	mov r2, $0x1400				@ n.o of bytes per row
 	add r3, r3, r2, lsl #5			@ r2 = 32nd row
 	str r3, [r0, #8]			@ put it in CB DEST_AD
 	
@@ -103,7 +102,7 @@ _init_dma0:
 	str r2, [r0, #4]			@ put SB into SOURCE_AD
 
 	/* TXFR_LEN */
-	mov r3, $0xf00				@ XLength = #3840 bytes
+	mov r3, $0x1400				@ XLength = #3840 bytes
 						@  stride being signed requires
 						@  i stay under 0x8000 
 	mov r2, $0x02b00000			@ YLength = #688 loops (shifted)
