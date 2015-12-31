@@ -112,9 +112,14 @@ _init_arm_timer:
 	bl _set_arm_timer
 
 	/* Display welcome text */
-	mov r0, $0x01
 	ldr r1, =Text1
 	ldr r2, =Text1lng	
+	ldr r3, =TermBuffer
+_LA:
+	ldrb r0, [r1], #1
+	strb r0, [r3], #1
+	subs r2, r2, $0x01
+	bne _LA
 	bl _print_string
 
 

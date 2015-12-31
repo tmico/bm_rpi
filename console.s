@@ -15,9 +15,77 @@
  *	TermCur (current line), TermStart and TermEnd
 */
 
-_print_buffer:
-	stmfd sp!, {r4 - r8}
+_print_buffer:			@ Funtional code to start. TODO colour support
+	stmfd sp!, {r4 - r8, lr}
+	ldr r12, =TermStart			@ ldr buffer* var
+	ldr r4, [r12]
+	ldr r12, =TermEnd
+	ldr r5, [r12]
+	ldr r12, =TermCur
+	ldr r6, [r12]
+	ldr r12, =TermBuffer
+	ldr r7, [r12]
+	ldr r12, =CursorLoc
+	ldr r8, [r12, #4]
+
+	cmp r6, $45				@ tst if on bottom line
+	bleq _scroll_page
+
+_PB1:
+	add r6, $1				@ next line
+
+	add r1, r4, r6				@ add line number to TermStart
+	and r1, r1, $0x7f			@ mask to keep looping TermBuffer
+	mov r0, r1, lsl $4
+	add r0, r0, r1, lsl $2			@ mul by 80
+	add r1, r7, r0				@ r1 points to loc in TermBuffer
+	bl _print_string
+
+	ldr r12, =CursorLoc
+	cmp r0, $'\n'				@ new line then loop
+	add r8, r8, $0x16			@ next line
+	str r8, [r12, #4]
+	bne _exit0
+	beq _PB1
+
+	cmp r6, $45
+	bmi _PB1
+
+_scroll_page:
+	ldr r12, =TermStart
+	addeq r4, r4, $1			@ if > scroll down buffer 
+	andeq r4, r4, $0x7f			@ 0 - 127
+	streq r4, [r12]
+
+	ldr r12, =TermEnd
+	addeq r2, r2, $1 
+	andeq r2, r2, $0x7f
+	streq r2, [r12]
+
+	ldr r12, =TermCur
+	mov r6, $0x0				@ reset curent line
+	str r6, [r12]
 	
+	ldr r12, =CursorLoc
+	mov r8, $0x00				@ mov CursorLoc back to top
+	str r8, [r12, #4]
+
+	bl _init_dma0				@ clear thte screen
+	
+	
+_exit0:
+	ldr r12, =TermStart			@ save buffer* var
+	str r4, [r12]
+	ldr r12, =TermEnd
+	str r5, [r12]
+	ldr r12, =TermCur
+	str r6, [r12]
+	ldr r12, =TermBuffer
+	str r7, [r12]
+
+	ldmfd sp!, {r4-r8, pc}			@ anything other then exit
+
+
 /* _print_string: for decoding the ascii string and selecting
  *	correct font. By default string will be	sent to stdout (screen).
  *	_print_buffer passes the address of the start of the string in r1.
@@ -32,14 +100,14 @@ _print_string:
 
 _u_vga16:
 	mov r5, r1				@ copy string addr
-	ldrb r3, [r5], $0x01
+	ldrb r0, [r5], $0x01
 	ldr r11, =Uvga16
 	ldr r10, =CursorLoc
 	add r11, r11, $0x30			@ offset to font data
 	ldrd r6, r7, [r10]
 
 _X1:
-	subs r3, r3, $0x20			@ sync ascii no to glyph pos
+	subs r3, r0, $0x20			@ sync ascii no to glyph pos
 	add r4, r11, r3, lsl #4			@ glyph addr
 	ldr r10, [r4], $0x04
 	mov r9, $0x04				@ y counter
@@ -96,14 +164,12 @@ _YL:
 	bne _X2					@ next row
 
 _X3:
-	ldrb r3, [r5], $0x01
+	ldrb r0, [r5], $0x01
 	add r6, r6, $0x08			@ new cusor loc
 	sub r7, r7, $0x10
-	teq r3, $0x00
-	teqne r3, $'\n'
+	teq r0, $0x00
+	teqne r0, $'\n'
 	bne _X1
-	ldr r10, =CursorLoc
-	strd r6, r7, [r10]			@ update CursorLoc
 
 	ldmfd sp!, {r4-r11, pc}			@ exit
 
@@ -154,31 +220,23 @@ Uvga16:
 	.incbin		"u_vga16.psf"
 
 
-	.global CursorLoc			@ Cursor location stored in mem
-CursorLoc:
-	.word 0x10				@ x coordinate
-	.word 0x00				@ y coordinate
 	
 	.global ScreenWidth
-	.global CursorPos
-
-CursorPos:
-	.word 0x74
-
+	.global CursorLoc			@ Cursor location stored in mem
 	.global Text1
 	.global Text1lng 
+	.global TermStart
+	.global TermEnd
+	.global TermCur
+	.global TermColour
+	.global TermBuffer
+	.global ScreenBuffer
 Text1:
 	.asciz "< Welcome to TMX O1 >"
 	Text1lng = . - Text1
 
-	.global ScreenBuffer		@ DMA transfer
-ScreenBuffer:				@ screen buffer to send to framebuffer
-	.rept 0x1400
-	.byte 0x00
-	.endr
-
 /* Terminal */
-	.align 4
+	.align 2
 TermStart:
 	.int 0x00				@ 1st line in buffer
 
@@ -191,14 +249,16 @@ TermCur:
 TermColour:
 	.byte 0x00
 
-
-TermScreen:
-	.int TermStart
-	.int TermEnd
-
+CursorLoc:
+	.word 0x10				@ x coordinate
+	.word 0x00				@ y coordinate
 
 TermBuffer:
-	.rept 160 * 128				@ 160 char by 128 lines. 
+	.rept 80 * 128				@ 160 char by 128 lines. 
 	.byte 0x00				@  128 = 0x80 which simplifies
 	.endr					@  a roll over count 
- 
+
+ScreenBuffer: 
+	.rept 0x1400
+	.byte 0x00
+	.endr

@@ -104,7 +104,7 @@ _set_pixel32:
 
 	mla r3, r1, r2, r0			@ y * width + x
 	ldr r0, [r12, #32]			@ GPU pointer
-	ldr r1, =FgColour			@  r0 = new mem loc 
+	ldr r1, =FgColour
 	ldr r2, [r1]	
 	add r0, r0, r3, lsl $2			@ x 4 for 32bit + GPU pointer
 	orr r2, r2, $0xff000000			@ set alpha value
