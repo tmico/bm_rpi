@@ -38,7 +38,7 @@
 	.align 2
 	.global FgColour
 FgColour:
-	.word 0xffffff
+	.word 0xffffffff
 
 	.align 4
 	.global GraphicsAdr

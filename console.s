@@ -23,8 +23,7 @@ _print_buffer:			@ Funtional code to start. TODO colour support
 	ldr r5, [r12]
 	ldr r12, =TermCur
 	ldr r6, [r12]
-	ldr r12, =TermBuffer
-	ldr r7, [r12]
+	ldr r7, =TermBuffer			@ Not content just address
 	ldr r12, =CursorLoc
 	ldr r8, [r12, #4]
 
@@ -32,17 +31,17 @@ _print_buffer:			@ Funtional code to start. TODO colour support
 	bleq _scroll_page
 
 _PB1:
-	add r6, $1				@ next line
 
 	add r1, r4, r6				@ add line number to TermStart
 	and r1, r1, $0x7f			@ mask to keep looping TermBuffer
-	mov r0, r1, lsl $4
-	add r0, r0, r1, lsl $2			@ mul by 80
+	mov r0, r1, lsl $6
+	add r0, r0, r1, lsl $4			@ mul by 80
 	add r1, r7, r0				@ r1 points to loc in TermBuffer
 	bl _print_string
 
 	ldr r12, =CursorLoc
 	cmp r0, $'\n'				@ new line then loop
+	add r6, $1				@ next line
 	add r8, r8, $0x16			@ next line
 	str r8, [r12, #4]
 	bne _exit0
@@ -52,6 +51,7 @@ _PB1:
 	bmi _PB1
 
 _scroll_page:
+	push {lr}
 	ldr r12, =TermStart
 	addeq r4, r4, $1			@ if > scroll down buffer 
 	andeq r4, r4, $0x7f			@ 0 - 127
@@ -71,7 +71,7 @@ _scroll_page:
 	str r8, [r12, #4]
 
 	bl _init_dma0				@ clear thte screen
-	
+	pop {pc}
 	
 _exit0:
 	ldr r12, =TermStart			@ save buffer* var
@@ -97,7 +97,6 @@ _print_string:
 	ldr r12, =SystemFont			@  set in SystemFont. Each font
 	ldr r11, [r12]				@  has its own optimized routine
 	bx r11
-
 _u_vga16:
 	mov r5, r1				@ copy string addr
 	ldrb r0, [r5], $0x01
@@ -105,16 +104,18 @@ _u_vga16:
 	ldr r10, =CursorLoc
 	add r11, r11, $0x30			@ offset to font data
 	ldrd r6, r7, [r10]
-
 _X1:
 	subs r3, r0, $0x20			@ sync ascii no to glyph pos
+	bmi _special_char
+	cmppl r3, $0x5e				@ tst valid ascii code
+	ldmplfd sp!, {r4-r11, pc}
 	add r4, r11, r3, lsl #4			@ glyph addr
 	ldr r10, [r4], $0x04
 	mov r9, $0x04				@ y counter
+
 _X2:
 	mov r8, $0x04				@ 1/4 font y counter
 	rev r10, r10				@ rev; revers byte order in Rm
-
 _XL:	@ Decided againt a loop to boost speed of execution. saves aprox 750 cycles per glyph
 	movs r10, r10, lsl #1			@ tst if bit falls off	
 	addcs r0, r6, $0x00
@@ -168,12 +169,15 @@ _X3:
 	add r6, r6, $0x08			@ new cusor loc
 	sub r7, r7, $0x10
 	teq r0, $0x00
-	teqne r0, $'\n'
+	teqne r0, $0x0a				@ tst for '\n'
 	bne _X1
 
 	ldmfd sp!, {r4-r11, pc}			@ exit
 
 
+_special_char:
+/* TODO*/
+	ldmfd sp!, {r4-r11, pc}			@ exit
 
 	/* binary to hex in assci converter. (uses BinHex lookup table)
 	 * Returns ascii coded value in r0-r1 (lsbyte in lsreg)	As such
@@ -215,50 +219,47 @@ EditUndo16:
 	.incbin		"editundo.adapt16.psf"	@ Fonts created by Brian kent
 						@  in psf format (bitmap) with
 						@  the unicode table stripped
-	
 Uvga16:
 	.incbin		"u_vga16.psf"
 
-
-	
-	.global ScreenWidth
-	.global CursorLoc			@ Cursor location stored in mem
 	.global Text1
-	.global Text1lng 
-	.global TermStart
-	.global TermEnd
-	.global TermCur
-	.global TermColour
-	.global TermBuffer
-	.global ScreenBuffer
 Text1:
 	.asciz "< Welcome to TMX O1 >"
+
+	.global Text1lng 
 	Text1lng = . - Text1
 
-/* Terminal */
-	.align 2
+	.global TermStart
 TermStart:
 	.int 0x00				@ 1st line in buffer
 
+	.global TermEnd
 TermEnd:
 	.int 0x2d				@ 45 lines apart from TerminalStart
 
+	.global TermCur
 TermCur:
 	.int 0x00				@ 1st line in buffer on screen
 
+	.global TermColour
 TermColour:
 	.byte 0x00
 
+	.align 3
+	.global CursorLoc			@ Cursor location stored in mem
 CursorLoc:
 	.word 0x10				@ x coordinate
 	.word 0x00				@ y coordinate
-
+	
+	.align 4
+	.global TermBuffer
 TermBuffer:
-	.rept 80 * 128				@ 160 char by 128 lines. 
+	.rept 80 * 128				@ 80 char by 128 lines. 
 	.byte 0x00				@  128 = 0x80 which simplifies
 	.endr					@  a roll over count 
 
-ScreenBuffer: 
-	.rept 0x1400
+	.global ScreenBuffer
+ScreenBuffer:					@ tmp to use by dma_0 to clear
+	.rept 0x1400				@  screen
 	.byte 0x00
 	.endr
