@@ -1,12 +1,20 @@
 /*
  *
  */
-
-	.text
+	
+.text
 	.align 2
 	.global _print_string
 	.global _print_buffer 
+	.global _printf
+	
 
+_kprint:
+/* _kprint funtion - converts values for printing according to args given
+	and converts to ascii and 'prints' to ScreenBuffer
+*/
+
+_print_buffer:			@ Funtional code to start. TODO colour support
 /* _print_buffer prints the content of TermBuffer within the range of
  *	TermScreen. TermScreen is what is displayed on screen but is
  *	itself just two pointers; a first line and last line that is to be 
@@ -14,8 +22,6 @@
  *	_print_buffer sends line by line the content of TermBuffer updating
  *	TermCur (current line), TermStart and TermEnd
 */
-
-_print_buffer:			@ Funtional code to start. TODO colour support
 	stmfd sp!, {r4 - r8, lr}
 	ldr r12, =TermStart			@ ldr buffer* var
 	ldr r4, [r12]
@@ -86,12 +92,12 @@ _exit0:
 	ldmfd sp!, {r4-r8, pc}			@ anything other then exit
 
 
+_print_string:
 /* _print_string: for decoding the ascii string and selecting
  *	correct font. By default string will be	sent to stdout (screen).
  *	_print_buffer passes the address of the start of the string in r1.
  *	_print string keeps on printing till a '\n' or 0x00 byte is met.
 */
-_print_string:
 
 	stmfd sp!, {r4-r11, lr}			@ This section loads font to use
 	ldr r12, =SystemFont			@  set in SystemFont. Each font
@@ -179,52 +185,96 @@ _special_char:
 /* TODO*/
 	ldmfd sp!, {r4-r11, pc}			@ exit
 
-	/* binary to hex in assci converter. (uses BinHex lookup table)
+	
+_bin_asciihex:
+	/* binary to hex in assci converter. Converts value in r0 to hex
 	 * Returns ascii coded value in r0-r1 (lsbyte in lsreg)	As such
 	 * it can return a max value of 0xFFFFFFFF which should be enough
 	 * as the pi is a 32bit system there is nothing to be gained from
-	 * from any higher value. value passed from r0 */
-_bin_hex:
-	stmfd sp!, {r8-r11}
-	ldr r11, =BinHex
+	* from any higher value (for this very basic os!) */
+
 	mov r12, r0				@ copy to work from
-	mov r3, $0xff000000			@ masking bits
+	
+	eor r0, r0, r0
+	eor r1, r1, r1
+	mov r3, $0x04				@ 4 x loop counter
+	
 _BH0:
-	eor r1, r1
-	mov r8, $24
-	and r10, r12, r3
-	ldrb r9, [r11, r10]
-	orr r1, r1, r9, lsl r8
-	subs r8, r8, $0x08
-	movmi r0, r1
-	movs r3, r3, lsr #4
-	bcc _BH0
-	ldmfd sp!, {r8-r11}
+	and r2, r12, $0x0f
+	cmp r2, $0xa
+	addmi r2, r2, $0x30			@ if 0-9
+	addpl r2, r2, $0x38			@ if 10-16
+	orr r0, r0, r2
+	ror r0, r0, $0x08			@ The author is proud of this little idea!!!
+
+	mov r12, r12, lsr $4			@ shift down for nxt and
+	subs r3, r3, $0x01
+	bne _BH0
+	mov r3, $0x04				@ 4 x loop counter
+_BH1:						@ repeat of code but for
+	and r2, r12, $0x0f			@  hi bits
+	cmp r2, $0xa
+	addmi r2, r2, $0x30			@ if 0-9
+	addpl r2, r2, $0x38			@ if 10-16
+	orr r1, r1, r2
+	ror r1, r1, $0x08
 	
-	
+	mov r12, r12, lsr $4
+	subs r3, r3, $0x01
+	bne _BH1
+	bx lr
+
+_bin_asciibin:	
+	/* _bin_asciibin converts 1 word (4bytes) value into an ascii string
+	 * of a binary number. The value to be converted is passed via r0.
+	 * The return string being potentially too long to return in r0-r3 is
+	 * instead passed via a pointer to a mem location (AsciiBin). R0 holds
+	 * the pointer, r1 the n.o char in the string. The max being 32.   */
+	ldr r12, =AsciiBin
+	clz r1, r0
+	rsb r1, r1, $32				@ n.o chars
+	mov r2, r1				/* Store multiple data in
+						 * single registor to save having
+						 * to push one on the stack
+						 * The hi value is a counter
+						 * Lo value is ascii '0'	*/
+
+	sub r2, r2, $1				@ countdown to negative not zero
+	mov r2, r2, lsl $16			@  as r2:lo holds value
+	orr r2, r2, $0x30			@ ascii '0'
+	mov r3, $0x31				@ ascii '1'
+_BA:
+	movs r0, r0, lsr #1			@ if cs then '1' else '0'
+	strcsb r3, [r12], #1
+	strccb r2, [r12], #1
+	subs r2, r2, $(1<<16)
+	bpl _BA
+	ldr r0, =AsciiBin
+	bx lr 
+
+/*============================================================================*/	
 	.data
 	.align 2
+AsciiBin:	
+	.rept 0x08
+	.word 0
+	.endr
+	
 	.global SystemFont
 SystemFont:
 	.word	_u_vga16
 
 
-BinHex:
-	.byte '0', '1', '2', '3'
-	.byte '4', '5', '6', '7'
-	.byte '8', '9', 'A', 'B'
-	.byte 'C', 'D', 'E', 'F'
-
 EditUndo16:
-	.incbin		"editundo.adapt16.psf"	@ Fonts created by Brian kent
+	.incbin	"editundo.adapt16.psf"		@ Fonts created by Brian kent
 						@  in psf format (bitmap) with
 						@  the unicode table stripped
 Uvga16:
-	.incbin		"u_vga16.psf"
+	.incbin	"u_vga16.psf"
 
 	.global Text1
 Text1:
-	.asciz "< Welcome to TMX O1 >"
+	.asciz "< Welcome to VIRUS O1 >"
 
 	.global Text1lng 
 	Text1lng = . - Text1
@@ -245,7 +295,7 @@ TermCur:
 TermColour:
 	.byte 0x00
 
-	.align 3
+	.align 3				@ 8 byte alignment for ldrd to work
 	.global CursorLoc			@ Cursor location stored in mem
 CursorLoc:
 	.word 0x10				@ x coordinate

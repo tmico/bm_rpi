@@ -15,9 +15,20 @@ _fiq_interupt:
 			@ without need to branch.
 	.global _reset
 _reset:
-	/* Enable branch prediction in System Control coprocessor (CP15)
+	/* Enable branch prediction in System Control coprocessor (CP15) and
+	/*  enable instruction cache  
+	/* mcr p15, 0, <rd>, c1, c0, 0  ; Read Control Register configuration
+	/* mrc p15, 0, <rd>, c1, c0, 0  ; write Control Register configuration
+	/*  bits [11] - branch prediction, [12] - L1 intruction cache	*/
 
-	@ TODO
+	mrc p15, 0, r0, c1, c0, 0	@ read control reg of p15
+	mov r1, $0x1800			@ bits 11 and 12
+	orr r0, r0, r1
+	mcr p15, 0, r0, c1, c0, 0	@ write to control reg of c15
+	
+	mov r0, $0x00
+	mcr p15, 0, r0, c7, c5, 0	@ invalidate I cache and flush btac
+
 	/* Set up the stack pointers for different cpu modes */
 	
 	mov r0, $0x11			@ Enter FIQ mode
@@ -48,7 +59,6 @@ _reset:
 	orr r0, r0, $0xc0
 	msr cpsr, r0
 	mov sp, $0xf40000		@ set its stack pointer
-
 
 	mov r0, $0x1b			@ Enter UNDEFINED mode
 	msr cpsr, r0			@ ensure irq and fiq are disabled
@@ -112,18 +122,16 @@ _init_arm_timer:
 	bl _set_arm_timer
 
 	/* Display welcome text */
-@@	ldr r1, =Text1
-@@	ldr r2, =Text1lng	
-@@	ldr r3, =TermBuffer
-@@_LA:
-@@	ldrb r0, [r1], #1
-@@	strb r0, [r3], #1
-@@	subs r2, r2, $0x01
-@@	bne _LA
-@@	bl _print_buffer
-
 	ldr r1, =Text1
-	bl _print_string
+	ldr r2, =Text1lng	
+	ldr r3, =TermBuffer
+_LA:
+	ldrb r0, [r1], #1
+	strb r0, [r3], #1
+	subs r2, r2, $0x01
+	bne _LA
+	bl _print_buffer
+
 	/* routine to move around the screen fabienne's pic*/
 _L0:
 	ldr r10, = FabPic
@@ -140,20 +148,21 @@ _L1:
 	mov r1, r4
 
 	bl _display_pic
+	bl _print_buffer
 
 
 	/* Attempt a dma transfer to clear screen */
-@@	ldr r5, =SysTimer
-@@_1:
-@@	ldr r12, [r5]
-@@	cmp r12, $0x08
-@@	bmi _1	
-@@	bl _init_dma0				@ clear screen
-@@	eor r12, r12
-@@	str r12, [r5]
+	ldr r5, =SysTimer
+_1:
+	ldr r12, [r5]
+	cmp r12, $0x08
+	bmi _1	
+	bl _init_dma0				@ clear screen
+	eor r12, r12
+	str r12, [r5]
 
 	
-@@	b _L1
+	b _L1
 
 _Bloop:						
 	b _Bloop	@ Catch all loop
