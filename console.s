@@ -4,8 +4,8 @@
 	
 .text
 	.align 2
-	.global _print_string
-	.global _print_buffer 
+	.global _print_line
+	.global _print_terminal_buffer 
 	.global _printf
 	
 
@@ -13,13 +13,17 @@ _kprint:
 /* _kprint funtion - converts values for printing according to args given
 	and converts to ascii and 'prints' to ScreenBuffer
 */
+_write_terminal_buffer:
 
-_print_buffer:			@ Funtional code to start. TODO colour support
-/* _print_buffer prints the content of TermBuffer within the range of
+	/*_write_terminal_buffer will take a string (ascii) passed via a pointer
+	 *  of a mem address in r0, the number of chars to be printed in r1
+
+_print_terminal_buffer:			@ Funtional code to start. TODO colour support
+/* _print_terminal_buffer prints the content of TermBuffer within the range of
  *	TermScreen. TermScreen is what is displayed on screen but is
  *	itself just two pointers; a first line and last line that is to be 
  *	printed.
- *	_print_buffer sends line by line the content of TermBuffer updating
+ *	_print_terminal_buffer sends line by line the content of TermBuffer updating
  *	TermCur (current line), TermStart and TermEnd
 */
 	stmfd sp!, {r4 - r8, lr}
@@ -43,7 +47,7 @@ _PB1:
 	mov r0, r1, lsl $6
 	add r0, r0, r1, lsl $4			@ mul by 80
 	add r1, r7, r0				@ r1 points to loc in TermBuffer
-	bl _print_string
+	bl _print_line
 
 	ldr r12, =CursorLoc
 	cmp r0, $'\n'				@ new line then loop
@@ -92,99 +96,111 @@ _exit0:
 	ldmfd sp!, {r4-r8, pc}			@ anything other then exit
 
 
-_print_string:
-/* _print_string: for decoding the ascii string and selecting
+_print_line:
+/* _print_line: for decoding the ascii string and selecting
  *	correct font. By default string will be	sent to stdout (screen).
- *	_print_buffer passes the address of the start of the string in r1.
- *	_print string keeps on printing till a '\n' or 0x00 byte is met.
+ *	_print_terminal_buffer passes the address of the start of the string in r1.
+ *	_print_line keeps on printing till a '\n' or 0x00 byte is met.
 */
+	sadr .req r11				@ string addr
+	gadr .req r10				@ glyph addr
+	x .req r6				@ x coordinate
+	y .req r7				@ y coordinate
+	c16 .req r9				@ row counter 16 (down)
+	char .req r5				@ char to be printed
+	bmap .req r5				@ bitmap
+	xy .req r4				@ cursor loc
+	tmp .req r8				@ scratch
 
+	/* r4,r12 free */
 	stmfd sp!, {r4-r11, lr}			@ This section loads font to use
-	ldr r12, =SystemFont			@  set in SystemFont. Each font
-	ldr r11, [r12]				@  has its own optimized routine
-	bx r11
+
 _u_vga16:
-	mov r5, r1				@ copy string addr
-	ldrb r0, [r5], $0x01
-	ldr r11, =Uvga16
-	ldr r10, =CursorLoc
-	add r11, r11, $0x30			@ offset to font data
-	ldrd r6, r7, [r10]
-_X1:
-	subs r3, r0, $0x20			@ sync ascii no to glyph pos
+	ldr gadr, =Uvga16
+	ldr xy, =CursorLoc
+	mov sadr, r1
+	add gadr, gadr, $0x30			@ add offset to bitmaps
+	ldrb char, [sadr], #1
+	ldrd x, y, [xy]
+_F1:	
+	subs char, char, $0x20
 	bmi _special_char
-	cmppl r3, $0x5e				@ tst valid ascii code
-	ldmplfd sp!, {r4-r11, pc}
-	add r4, r11, r3, lsl #4			@ glyph addr
-	ldr r10, [r4], $0x04
-	mov r9, $0x04				@ y counter
+	add tmp, gadr, char, lsl #4
+	ldrb bmap, [tmp], #1
+	mov c16, $0x10				@ 16 rows
+_F2:
+	movs bmap, bmap, lsl #24		@ endianes issue plus allows
+	beq _F4					@  testing using N flag
+	addmi r0, x, $0				@  the 8th shift is pointless
+	movmi r1, y				@  as it will always be a '0'
+	blmi _set_pixel32
+						
+	movs bmap, bmap, lsl #1
+	beq _F4
+	addmi r0, x, $1
+	movmi r1, y
+	blmi _set_pixel32
 
-_X2:
-	mov r8, $0x04				@ 1/4 font y counter
-	rev r10, r10				@ rev; revers byte order in Rm
-_XL:	@ Decided againt a loop to boost speed of execution. saves aprox 750 cycles per glyph
-	movs r10, r10, lsl #1			@ tst if bit falls off	
-	addcs r0, r6, $0x00
-	movcs r1, r7
-	blcs _set_pixel32
+	movs bmap, bmap, lsl #1
+	beq _F4
+	addmi r0, x, $2
+	movmi r1, y
+	blmi _set_pixel32
+	
+	movs bmap, bmap, lsl #1
+	beq _F4
+	addmi r0, x, $3
+	movmi r1, y
+	blmi _set_pixel32
 
-	movs r10, r10, lsl #1			@ tst if bit falls off	
-	addcs r0, r6, $0x01
-	movcs r1, r7
-	blcs _set_pixel32
+	movs bmap, bmap, lsl #1
+	beq _F4
+	addmi r0, x, $4
+	movmi r1, y
+	blmi _set_pixel32
 
-	movs r10, r10, lsl #1			@ tst if bit falls off	
-	addcs r0, r6, $0x02
-	movcs r1, r7
-	blcs _set_pixel32
+	movs bmap, bmap, lsl #1
+	beq _F4
+	addmi r0, x, $5
+	movmi r1, y
+	blmi _set_pixel32
 
-	movs r10, r10, lsl #1			@ tst if bit falls off	
-	addcs r0, r6, $0x03
-	movcs r1, r7
-	blcs _set_pixel32
+	movs bmap, bmap, lsl #1
+	beq _F4
+	addmi r0, x, $6
+	movmi r1, y
+	blmi _set_pixel32
 
-	movs r10, r10, lsl #1			@ tst if bit falls off	
-	addcs r0, r6, $0x04
-	movcs r1, r7
-	blcs _set_pixel32
+_F4:
+	add y, y, $0x01				@ set coordinates for next row
+	subs c16, c16, $1
+	ldrneb bmap, [tmp], #1
+	bne _F2
 
-	movs r10, r10, lsl #1			@ tst if bit falls off	
-	addcs r0, r6, $0x05
-	movcs r1, r7
-	blcs _set_pixel32
+	add x, x, $0x08				@ set next char coordinates
+	sub y, y, $0x10
 
-	movs r10, r10, lsl #1			@ tst if bit falls off	
-	addcs r0, r6, $0x06
-	movcs r1, r7
-	blcs _set_pixel32
-
-	movs r10, r10, lsl #1			@ tst if bit falls off	
-	addcs r0, r6, $0x07
-	movcs r1, r7
-	blcs _set_pixel32
-_YL:
-	subs r8, r8, $0x01			@ 1/4 font height counter 
-	add r7, r7, $0x01
-	bne _XL
-	subs r9, r9, $0x01			@ reset x	
-	ldrne r10, [r4], $0x04
-	bne _X2					@ next row
-
-_X3:
-	ldrb r0, [r5], $0x01
-	add r6, r6, $0x08			@ new cusor loc
-	sub r7, r7, $0x10
-	teq r0, $0x00
-	teqne r0, $0x0a				@ tst for '\n'
-	bne _X1
-
-	ldmfd sp!, {r4-r11, pc}			@ exit
+	ldrb char, [sadr], #1
+	b _F1
 
 
 _special_char:
-/* TODO*/
+/* TO Finish*/
+	strd x, y, [xy]
+	cmn char, $20				@ -20 = null char(see _F1 )
+	cmn char, $10				@ -10 = '\n'
+	moveq r0, $10
 	ldmfd sp!, {r4-r11, pc}			@ exit
 
+.unreq char
+.unreq x
+.unreq y
+.unreq xy
+.unreq tmp
+.unreq bmap
+.unreq sadr
+.unreq gadr
+.unreq c16
 	
 _bin_asciihex:
 	/* binary to hex in assci converter. Converts value in r0 to hex
@@ -252,19 +268,49 @@ _BA:
 	ldr r0, =AsciiBin
 	bx lr 
 
-/*============================================================================*/	
+_bin_asciidec:
+	/* Convert binary number (=< 32bits) into ascii decimal values */
+	/* Toyed with idea of using double dabble method to get binary numbers
+	 * stored in bcd format and then adding 0x30h to get ascii code for
+	 * each 4bit bcd, but as much as i love the algorithm its way to slow
+	 * for 32 bits so instead its div by 10, convert remainder to ascii
+	 * store and repeat by div quotant and convert remainder.
+	*/
+	ldr r1, =0xcccccccd			@ 1/10 << 35
+	ldr r12, =AsciiBcd 
+_DA:	
+	umull r2, r3, r0, r1
+	mov r0, r3, lsr $3			@ move quotent back into r0
+	and r3, r3, $7				@ isolate remainder 
+	add r3, r3, lsl $2			@ r = r *5 << 3
+	movs r3, r3, lsr $2			@ r = r*2 >>3
+	movccs r2, r2, lsl $1			@ test if rounding correction needed 
+	addcs r3, r3, $1			@ the remainder
+	/* 'convert into ascii and store */
+	add r3, r3, $0x30
+	str r3, [r12], $1
+	cmp r0, $10
+	bpl _DA
+	add r0, r0, $0x30
+	str r0, [r12]
+	ldr r0, =AsciiBcd
+	bx lr
+	
 	.data
 	.align 2
 AsciiBin:	
 	.rept 0x08
 	.word 0
 	.endr
-	
+AsciiBcd:
+	.rept 0xa
+	.byte 0
+	.endr
+
 	.global SystemFont
 SystemFont:
-	.word	_u_vga16
-
-
+	.word _u_vga16
+	
 EditUndo16:
 	.incbin	"editundo.adapt16.psf"		@ Fonts created by Brian kent
 						@  in psf format (bitmap) with
@@ -274,7 +320,7 @@ Uvga16:
 
 	.global Text1
 Text1:
-	.asciz "< Welcome to VIRUS O1 >"
+	.asciz "< Welcome to VIRUS O1 >\n --- writen in assembler ---"
 
 	.global Text1lng 
 	Text1lng = . - Text1

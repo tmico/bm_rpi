@@ -43,7 +43,7 @@ _reset:
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0xf00000		@ set its stack pointer
+	mov sp, $0xf10000		@ set its stack pointer
 	
 	
 	mov r0, $0x13			@ Enter SWI mode
@@ -80,7 +80,7 @@ _reset:
 	str r1, [r0, $0x218]
 	ldr r2, =_arm_timer_interupt	@ loading loc of lable
 	ldr r3, =IrqHandler
-	str r2, [r3, $256]		@ timer handler has 256 offset
+	str r2, [r3, $380]		@ timer handler has 95*4 offset
 	/*	End of enable interupts		*/
 	b _main
 
@@ -97,10 +97,13 @@ _main:
 	mov r1, $0				@ turn off power turns on led
 	bl _set_gpio
 	
+_init_arm_timer:
+	mov r0, $0x6a000			@ tiny fraction under 1/2 sec
+	bl _set_arm_timer
+
 	/* To use defaults set in framebuffer.s set r0 to zero.
 	 * Otherwise r0 is virtual width, r1 virtual height and r2 is colour 
 	 * depth  */
-
 	mov r0, $1280				@ 1280
 	mov r1, $720				@ 720
 	mov r2, $32
@@ -117,9 +120,6 @@ _set_fb_colour:
 	bl _fg_colour
 
 	/* seting up timer (The interrupt handler makes green led blink */
-_init_arm_timer:
-	mov r0, $0x6a000			@ tiny fraction under 1/2 sec
-	bl _set_arm_timer
 
 	/* Display welcome text */
 	ldr r1, =Text1
@@ -130,8 +130,8 @@ _LA:
 	strb r0, [r3], #1
 	subs r2, r2, $0x01
 	bne _LA
-	bl _print_buffer
 
+	bl _print_buffer
 	/* routine to move around the screen fabienne's pic*/
 _L0:
 	ldr r10, = FabPic
@@ -148,10 +148,11 @@ _L1:
 	mov r1, r4
 
 	bl _display_pic
-	bl _print_buffer
+	
 
 
 	/* Attempt a dma transfer to clear screen */
+/*	
 	ldr r5, =SysTimer
 _1:
 	ldr r12, [r5]
@@ -163,17 +164,15 @@ _1:
 
 	
 	b _L1
-
+	*/
 _Bloop:						
 	b _Bloop	@ Catch all loop
 
 	.global _error$
 _error$:
-	mov r0, $16				@ GPIO led pin 
-	mov r1, $1				@ set to output
-	bl _set_gpio_func 
-	mov r1, $0				@ turn off pin to turn on led
-	bl _set_gpio
+	mov r0, $0x3a000			
+	bl _set_arm_timer
+
 	b _Bloop
 
 	.data

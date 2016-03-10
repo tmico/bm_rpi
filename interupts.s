@@ -56,47 +56,46 @@ _irq_interupt:
 				@  higher than instruction we want to return to
 	stmfd sp!, {r0-r12, lr}	
 
-	ldr r1, =0x2000b200			@ basic pending register
-	ldm r1, {r2-r4}				@ load multiple in one go
-	ldr r5, =IrqHandler
+	mov r11, $0x20000000			@ basic pending register
+	add r11, r11, $0xb200
+	ldr r8, [r11]
+	ldr r7, =IrqHandler
 _irq_source:
-	and r8, r2, $100			@ If pending_1 has IRQ save it
-	and r9, r2, $200			@ If pending_2 has IRQ save it
-	bics r0, r2, $0x300			@ mask off and test bits 8,9
-	beq _tst_bit8
 	mov r6, $64
+	and r9, r8, $0x300			@ If pending_1/2 has IRQ save it
+	bics r10, r8, $0x300			@ mask off and test bits 8,9
+	beq _tst_bit89
 _irq_bit:
-	/* source of irq in r0	*/
-	clz r1, r0				@ preserve r0 for testing 
-	rsb r1, r1, $31				@ calculate bit position
-	add r2, r6, r1
-	ldr r7, [r5, r2, lsl $2]
-	blx r7		
-	mov r2, $1
-	mov r2, r2, lsl r1
-	bics r0, r0, r2
+	/* source of irq in r10	*/
+	clz r1, r10				@ preserve r10 for testing 
+	add r8, r6, r1				@  r1 is scratch
+	ldr r0, [r7, r8, lsl $2]		@ r8*4 = offset 
+	mov r8, $(1<<31)
+	bic r10, r10, r8, lsr r1
+	blx r0		
+	cmp r10, $0
 	bne _irq_bit
-	teq r8, $100				@ something in pending_1?
-	beq _tst_bit8
-	teq r9, $200
-	beq _tst_bit9				@ something in pending_2?
+	tst r9, $0x100				@ something in pending_1?
+	bne _bit8
+	tst r9, $0x200
+	bne _bit9				@ something in pending_2?
 	ldmfd sp!, {r0-r12, pc}^		@ return from interrupt
- _tst_bit8:
-	teq r8, $0x100
-	bne _tst_bit9
-	bic r8, r8, $0x100			@ test bit 8 and clear if set
-	bic r3, r3, $((1<<7)|(1<<9)|(1<<10))	@ clear duplicate interupts
-	bic r3, r3, $((1<<18)|(1<<19))		@ also set in basic
-	moveq r0, r3
-	moveq r6, $0
+_tst_bit89:
+	teq r9, $0x100
+	bne _bit9
+_bit8:	
+	ldr r10, [r11, $4]
+	mov r6, $0
+	bic r9, r9, $0x100			@ clear bit 8 if set
+	bic r10, r10, $(13<<7)			@ clear duplicate interupts
+	bic r10, r10, $(3<<18)			@  also set in basic	
 	beq _irq_bit
-_tst_bit9:
-	teq r9, $0x200				@ tst bit 9 and clear if set
-	bic r9, r9, $0x200
-	bic r4, r4, $((31<<21))			@ clear duplicate interupts
-	bic r4, r4, $((1<<30))			@	also set in basic
-	moveq r0, r4
+_bit9:
+	ldr r10, [r11, $8]
 	moveq r6, $32				@ r6 + bit position = irq no
+	bic r9, r9, $0x200
+	bic r10, r10, $(31<<21)			@ clear duplicate interupts
+	bic r10, r10, $(1<<30)			@	also set in basic
 	bal _irq_bit
 
 /* IRQ handlers. 
@@ -110,100 +109,25 @@ TO DO !!!	*/
 	.global _arm_timer_interupt
 _arm_timer_interupt:	
 	/* First clear the pending interupt */
-	mov r11, $0x20000000			@ timer base address
-	add r11, r11, $0xb000
-	mov r10, $1
-	str r10, [r11, $0x40c]
-	ldr r11, = IrqService
-	ldr r10, [r11]
-	push {r0-r1, lr}
-	mov r12, $1
-	eor r1, r10, r12
-	str r1, [r11]
+	mov r2, $0x20000000			@ timer base address
+	add r2, r2, $0xb000
+	mov r5, $1
+	str r5, [r2, $0x40c]
+	ldr r3, = IrqService
+	ldr r1, [r3]
 	mov r0, $16
+	mov r4, lr				@ preserv lr
+	eor r1, r1, $1
+	str r1, [r3]
 	bl _set_gpio
-
-	ldr r0, =SysTimer
-	ldr r1, [r0]
-	add r1, r1, $0x01
-	str r1, [r0]
-	pop {r0-r1, pc}
+	bx r4
 .data
 .align 2
 	.global IrqHandler
 
-IrqHandler:			@ 84 irq handlers pointers
-	.word	@ IRQ 1 
-	.word	@ IRQ 2 
-	.word	@ IRQ 3 
-	.word	@ IRQ 4 
-	.word	@ IRQ 5 
-	.word	@ IRQ 6 
-	.word	@ IRQ 7 
-	.word	@ IRQ 8 
-	.word	@ IRQ 9 
-	.word	@ IRQ 10
-	.word	@ IRQ 11
-	.word	@ IRQ 12
-	.word	@ IRQ 13
-	.word	@ IRQ 14
-	.word	@ IRQ 15
-	.word	@ IRQ 16
-	.word	@ IRQ 17
-	.word	@ IRQ 18
-	.word	@ IRQ 19
-	.word	@ IRQ 20
-	.word	@ IRQ 21
-	.word	@ IRQ 22
-	.word	@ IRQ 23
-	.word	@ IRQ 24
-	.word	@ IRQ 25
-	.word	@ IRQ 26
-	.word	@ IRQ 27
-	.word	@ IRQ 28
-	.word	@ IRQ 29
-	.word	@ IRQ 30
-	.word	@ IRQ 31
-	.word	@ IRQ 32
-	.word	@ IRQ 33
-	.word	@ IRQ 34
-	.word	@ IRQ 35
-	.word	@ IRQ 36
-	.word	@ IRQ 37
-	.word	@ IRQ 38
-	.word	@ IRQ 39
-	.word	@ IRQ 40
-	.word	@ IRQ 41
-	.word	@ IRQ 42
-	.word	@ IRQ 43
-	.word	@ IRQ 44
-	.word	@ IRQ 45
-	.word	@ IRQ 46
-	.word	@ IRQ 47
-	.word	@ IRQ 48
-	.word	@ IRQ 49
-	.word	@ IRQ 50
-	.word	@ IRQ 51
-	.word	@ IRQ 52
-	.word	@ IRQ 53
-	.word	@ IRQ 54
-	.word	@ IRQ 55
-	.word	@ IRQ 56
-	.word	@ IRQ 57
-	.word	@ IRQ 58
-	.word	@ IRQ 59
-	.word	@ IRQ 60
-	.word	@ IRQ 61
-	.word	@ IRQ 62
-	.word	@ IRQ 63
-	.word	@ IRQ 64
-	.word	@ IRQ 65
-	.word	@ IRQ 66
-	.word	@ IRQ 67
-	.word	@ IRQ 68
-	.word	@ IRQ 69
-	.word	@ IRQ 70
-	.word	@ IRQ 71
-
+IrqHandler:			@ 96 irq handlers pointers
+	.rept 96
+	.word 0
+	.endr
 IrqService:
 	.word	0x1		@ Address of routine that set timer interupt
