@@ -4,7 +4,8 @@
 	
 .text
 	.align 2
-	.global _print_terminal_buffer 
+	.global _write_tfb
+	.global _print_tfb 
 	.global _printf
 	
 
@@ -12,24 +13,110 @@ _kprint:
 /* _kprint funtion - converts values for printing according to args given
 	and converts to ascii and 'prints' to ScreenBuffer
 */
-_write_terminal_buffer:
-
-	/*_write_terminal_buffer will take a string (ascii) passed via a pointer
+_write_tfb:
+	/*_write_tfb will take a string (ascii) passed via a pointer
 	 *  of a mem address in r0, the number of chars to be printed in r1
-	*/
-_print_terminal_buffer:			@ Funtional code to start. TODO colour support
-/* _print_terminal_buffer prints the content of TermBuffer within the range of
+	 */
+
+	tb .req r4				@ terminal buffer
+	tc .req r5				@ terminal current line
+	x .req r6				@ screen across
+	nx .req r6				@ negative x				
+	y .req r7				@ screen down
+	in .req r1				@ pointer of string
+	noc .req r2				@ n.o chars to write
+	char .req r8				@ char loaded from string
+	tba .req r9				@ termbuffer addr
+
+	stmfd sp!, {r4 - r9}
+	ldr tb, =TermBuffer
+	ldr r12, =CursorLoc
+	ldrd x, y, [r12]
+	ldr r12, =TermCur
+	ldr tc, [r12]
+
+	ldrb char, [in], $1
+	sub y, y, $44				@ no of lines left.
+						 
+	add tba, x, tc, lsl $6			@ tx * 80 + tc = tb char addr
+	add tba, tba, tc, lsl $4 
+	add tba, tba, tb
+	rsb nx, x, $79				@ no spaces left
+_WT0:	
+	cmp char, $0x20
+	bmi _non_write
+	strb char, [tba], $1
+	subs noc, noc, $1			@ string counter
+	beq _zero
+	subs nx, nx, $1
+	ldrneb char, [in], $1
+	b _WT0
+	b _next_line
+_non_write:
+	cmp char, $'\n'
+	beq _next_line
+	cmp char, $0x0
+	beq _zero
+_next_line:	
+	add tc, tc, $0x1
+	and tc, tc, $0x7f
+	add y, y, $0x1
+	mov nx, $79
+	add tba, tb, tc, lsl $6
+	add tba, tba, tc, lsl $4
+	ldrb char, [in], $1
+	b _WT0
+_zero:
+	mov char, $0
+	strb char, [tba]
+
+	cmp y, $0
+	movmi r0, $0
+	bmi _exit0
+	ldr r12, =TermEnd
+	ldr r3, [r12]
+	add r2, y, $0x01			@ TermEnd 1 line clear
+	add r3, r3, r2
+	and r3, r3, $0x7f
+	str r3, [r12]
+	ldr r2, =TermStart
+	ldr r1, =TermCur
+	ldr r12, =CursorLoc
+	sub tc, r3, $45
+	and tc, tc, $0x7f
+	str tc, [r2]
+	str tc, [r1]
+	mov x, $0
+	mov y, $0
+	strd x, y, [r12]
+
+	
+_exit0:
+	ldmfd sp!, {r4 - r9}
+	bx lr
+
+	.unreq tb
+	.unreq tc
+	.unreq x
+	.unreq nx
+	.unreq y
+	.unreq in
+	.unreq noc
+	.unreq char
+	.unreq tba
+_print_tfb:			@ Funtional code to start. TODO colour support
+/* _print_tfb prints the content of TermBuffer within the range of
  *	TermScreen. TermScreen is what is displayed on screen but is
  *	itself just two pointers; a first line and last line that is to be 
  *	printed.
- *	_print_terminal_buffer sends line by line the content of TermBuffer updating
+ *	_print_tfb sends line by line the content of TermBuffer updating
  *	TermCur (current line), TermStart and TermEnd
 */
 	scratch .req r12
 	tc .req r4				@ current line
 	tb .req r5				@ termial buffer 
 	x .req r6 				@ x [0-79]
-	y .req r7				@ y [1-45]
+	y .req r7				@ y [0-44]
 	
 	stmfd sp!, {r4 - r11, lr}
 	ldr scratch, =TermCur
@@ -302,7 +389,7 @@ TermColour:
 	.align 3				@ 8 byte alignment for ldrd to work
 	.global CursorLoc			@ Cursor location stored in mem
 CursorLoc:
-	.word 0x10				@ x coordinate
+	.word 0x00				@ x coordinate
 	.word 0x00				@ y coordinate
 	
 	.align 4

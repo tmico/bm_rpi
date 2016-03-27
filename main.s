@@ -131,7 +131,7 @@ _LA:
 	subs r2, r2, $0x01
 	bne _LA
 
-	bl _print_terminal_buffer		@ Funtional _print_buffer
+	bl _print_tfb		@ Funtional _print_buffer
 	/* routine to move around the screen fabienne's pic*/
 _L0:
 	ldr r10, = FabPic
