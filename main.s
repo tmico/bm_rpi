@@ -124,14 +124,12 @@ _set_fb_colour:
 	/* Display welcome text */
 	ldr r1, =Text1
 	ldr r2, =Text1lng	
-	ldr r3, =TermBuffer
-_LA:
-	ldrb r0, [r1], #1
-	strb r0, [r3], #1
-	subs r2, r2, $0x01
-	bne _LA
-
+	bl _write_tfb
+	
+	cmp r0, $0
+	blne _clrscr_dma0				
 	bl _print_tfb		@ Funtional _print_buffer
+
 	/* routine to move around the screen fabienne's pic*/
 _L0:
 	ldr r10, = FabPic
@@ -158,7 +156,7 @@ _1:
 	ldr r12, [r5]
 	cmp r12, $0x08
 	bmi _1	
-	bl _init_dma0				@ clear screen
+	bl _clrscr_dma0				@ clear screen
 	eor r12, r12
 	str r12, [r5]
 

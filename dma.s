@@ -80,14 +80,14 @@
 	[0-14]_NEXTCNBK		31:0	Addr of next CB. Stop if 0x00000000
 ******************************************************************************/
 	.text
-	.global _init_dma0
-	/* For time being _init_dma0 is going to tranfer a buffer from mem to 
+	.global _clrscr_dma0
+	/* For time being _clrscr_dma0 is going to tranfer a buffer from mem to 
 	   the gpu. A memory to GPU transfer. SreenBuffer is a buffer of
 	   1 row of pixels acrros the screen. In 24bit mode thats 3,840 (0xf00)
 	   bytes. In this implimentation going to use 2D xlengths of 3,840 bytes
 	   x 720 (n.o rows) ylengths to clear the screen 
 	*/ 
-_init_dma0:
+_clrscr_dma0:
 	/* DEST_AD */
 	ldr r0, =ConBlk_0
 	ldr r2, =GraphicsAdr

@@ -6,16 +6,16 @@
 	.align 2
 	.global _write_tfb
 	.global _print_tfb 
-	.global _printf
+	.global _kprint
 	
 
-_kprint:
+@_kprint:
 /* _kprint funtion - converts values for printing according to args given
-	and converts to ascii and 'prints' to ScreenBuffer
+	and converts to ascii and stores in StdOut
 */
 _write_tfb:
-	/*_write_tfb will take a string (ascii) passed via a pointer
-	 *  of a mem address in r0, the number of chars to be printed in r1
+	/*_write_tfb will take a string (ascii) passed stored in StdOut
+	 *  of a mem address in r1, the number of chars to be printed in r2
 	 */
 
 	tb .req r4				@ terminal buffer
@@ -44,13 +44,13 @@ _write_tfb:
 	rsb nx, x, $79				@ no spaces left
 _WT0:	
 	cmp char, $0x20
-	bmi _non_write
 	strb char, [tba], $1
+	bmi _non_write
 	subs noc, noc, $1			@ string counter
 	beq _zero
 	subs nx, nx, $1
 	ldrneb char, [in], $1
-	b _WT0
+	bne _WT0
 	b _next_line
 _non_write:
 	cmp char, $'\n'
@@ -67,8 +67,9 @@ _next_line:
 	ldrb char, [in], $1
 	b _WT0
 _zero:
-	mov char, $0
-	strb char, [tba]
+	cmp char, $0
+	movne char, $0
+	strneb char, [tba]
 
 	cmp y, $0
 	movmi r0, $0
@@ -89,7 +90,7 @@ _zero:
 	mov x, $0
 	mov y, $0
 	strd x, y, [r12]
-
+	mov r0, $1				@ return 1 to refresh screen
 	
 _exit0:
 	ldmfd sp!, {r4 - r9}
@@ -109,8 +110,6 @@ _print_tfb:			@ Funtional code to start. TODO colour support
  *	TermScreen. TermScreen is what is displayed on screen but is
  *	itself just two pointers; a first line and last line that is to be 
  *	printed.
- *	_print_tfb sends line by line the content of TermBuffer updating
- *	TermCur (current line), TermStart and TermEnd
 */
 	scratch .req r12
 	tc .req r4				@ current line
@@ -294,23 +293,22 @@ _bin_asciibin:
 	ldr r12, =AsciiBin
 	clz r1, r0
 	rsb r1, r1, $32				@ n.o chars
-	mov r2, r1				/* Store multiple data in
+	mov r2, $31				/* Store multiple data in
 						 * single registor to save having
 						 * to push one on the stack
 						 * The hi value is a counter
 						 * Lo value is ascii '0'	*/
 
-	sub r2, r2, $1				@ countdown to negative not zero
 	mov r2, r2, lsl $16			@  as r2:lo holds value
 	orr r2, r2, $0x30			@ ascii '0'
 	mov r3, $0x31				@ ascii '1'
 _BA:
-	movs r0, r0, lsr #1			@ if cs then '1' else '0'
-	strcsb r3, [r12], #1
+	movs r0, r0, lsl #1			@ if cs then '1' else '0'
 	strccb r2, [r12], #1
+	strcsb r3, [r12], #1
 	subs r2, r2, $(1<<16)
 	bpl _BA
-	ldr r0, =AsciiBin
+	sub r0, r12, $33			@ faster than ldr
 	bx lr 
 
 _bin_asciidec:
@@ -333,19 +331,19 @@ _DA:
 	addcs r3, r3, $1			@ the remainder
 	/* 'convert into ascii and store */
 	add r3, r3, $0x30
-	str r3, [r12], $1
+	strb r3, [r12], $1
 	cmp r0, $10
 	bpl _DA
 	add r0, r0, $0x30
-	str r0, [r12]
+	strb r0, [r12]
 	ldr r0, =AsciiBcd
 	bx lr
 	
 	.data
 	.align 2
 AsciiBin:	
-	.rept 0x08
-	.word 0
+	.rept 0x20
+	.byte 0
 	.endr
 AsciiBcd:
 	.rept 0xa
@@ -365,7 +363,7 @@ Uvga16:
 
 	.global Text1
 Text1:
-	.asciz "< Welcome to VIRUS O1 >\n --- writen in assembler ---"
+	.asciz "< Welcome to VIRUS O1 >\n--- Writen in assembler ---\n--- Which is well cool!!! ---\n"
 
 	.global Text1lng 
 	Text1lng = . - Text1
@@ -403,4 +401,8 @@ TermBuffer:
 ScreenBuffer:					@ gadr to use by dma_0 to clear
 	.rept 0x1400				@  screen
 	.byte 0x00
+	.endr
+StdOut:
+	.rept 0x400				@ 1024 bytes reserved
+	.byte 0x0
 	.endr
