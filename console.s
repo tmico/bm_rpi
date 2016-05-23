@@ -12,6 +12,12 @@
 @_kprint:
 /* _kprint funtion - converts values for printing according to args given
 	and converts to ascii and stores in StdOut
+	_kprint is a variadic function. As such arguments given to it are
+	passed to it via the stack.
+	befor args are pushed onto the stack the sp is copied to r0.
+	r1 hold the addr of last arg on the stack. Thus r0 will be copied back
+	to sp before returning from _kprint
+
 */
 _write_tfb:
 	/*_write_tfb will take a string (ascii) passed stored in StdOut
