@@ -19,6 +19,19 @@
 	to sp before returning from _kprint
 
 */
+	sps .req r4		@ sp pre args (spstart)
+	spe .req r5		@ sp last arg
+
+	ldmfd sp!, {r4 - r11}
+	mov sps, r0
+	mov spe, r1
+
+	ldmfd spe!, {r3}			@ 1st arg is 'header'
+
+	
+
+	.unreq sps
+	.unreq spe
 _write_tfb:
 	/*_write_tfb will take a string (ascii) passed stored in StdOut
 	 *  of a mem address in r1, the number of chars to be printed in r2
