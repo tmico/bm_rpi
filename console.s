@@ -9,7 +9,7 @@
 	.global _kprint
 	
 
-@_kprint:
+_kprint:
 /* _kprint funtion - converts values for printing according to args given
 	and converts to ascii and stores in StdOut
 	_kprint is a variadic function. As such arguments given to it are
@@ -17,19 +17,44 @@
 	befor args are pushed onto the stack the sp is copied to r0.
 	r1 hold the addr of last arg on the stack. Thus r0 will be copied back
 	to sp before returning from _kprint
-
+	1st byte type	Meaning
+		c	single char
+		d	decimal int
+		b	binary int
+		f	float
+		s	string
+		x	hexadecimal
+	2nd byte type	Meaning
+		u	unsigned
+		l	long
+	
 */
 	sps .req r4		@ sp pre args (spstart)
 	spe .req r5		@ sp last arg
 
-	ldmfd sp!, {r4 - r11}
+	stmfd sp!, {r4 - r11}
 	mov sps, r0
 	mov spe, r1
 
 	ldmfd spe!, {r3}			@ 1st arg is 'header'
-
-	
-
+	and r2, r3, $0xf			@ issolate 1st byte to get type
+	cmp r2, $'d'
+	beq _intiger				@ Must be a better way than
+	cmp r2, $'s'				@  endless cmp!
+	beq _string
+	cmp r2, $'c'
+	beq _char
+	cmp r2, $'f'
+	beq _float
+	cmp r2, $'x'
+	beq _hex
+	cmp r2, $'b'
+_binary:	
+_intiger:	
+_string:	
+_char:	
+_float:	
+_hex:	
 	.unreq sps
 	.unreq spe
 _write_tfb:
@@ -358,14 +383,56 @@ _DA:
 	ldr r0, =AsciiBcd
 	bx lr
 	
+_bin_asciidec_long:	
+	/* Convert a 64 bit binary number into ascii decimal values
+	   This routine make use of the 'multiply long accumalate' op in the
+	   arm11 unit. Neadless to say this is a time consumiing operation
+	   r0 is lo; r1 is hi
+	*/
+	lo10	.req r2			@ reciprical lo
+	hi10	.req r3			@ reciprical hi
+	llo	.req r4			@ lo lo
+	lhi	.req r5			@ lo hi
+	hlo	.req r6			@ hi lo
+	hhi	.req r7			@ hi hi
+	scratch	.req r8			@ scratch
+	
+	stmfd sp!, {r4 -r8}
+	ldr lo10, =0xcccccccd
+	ldr r12, =AsciiBcd
+	sub hi10, lo10, $0x1
+	
+	umull llo, lhi, r0, lo10
+	mov hlo, $0
+	umlal lhi, hlo, r0, hi10
+	mov scratch, $0
+	umlal lhi, scratch, r1, lo10
+	mov hhi, $0
+	adds hlo, hlo, scratch
+	adc hhi, hhi, hhi
+	umlal hlo, hhi, r1, hi10
+	/* After the above routine the remainder is in
+	llo lhi and least significant 3 bits of hlo.
+	(you can imagine the point was between r5 r6 and has been << 3 places)
+	*/
+	and scratch, hlo, $0x7			@ Isolate remainder
+	add scratch, scratch, scratch, lsl $2
+	movs scratch, scratch, lsr $2
+	movccs lhi, lhi, lsl $1			@ Correct rounding errors
+	adc scratch, scratch, $0
+	
+	
+	
+	
 	.data
 	.align 2
+
 AsciiBin:	
 	.rept 0x20
 	.byte 0
 	.endr
 AsciiBcd:
-	.rept 0xa
+	.rept 0x16
 	.byte 0
 	.endr
 
