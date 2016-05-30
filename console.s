@@ -435,17 +435,18 @@ _DLA
 	mov r1, hhi, lsr $3
 	b _DLA
 _DL1:
+	mov r0, lo10
 	umull r2, r3, r0, r1		@TODO change registers
-	mov r0, r3, lsr $3			@ move quotent back into r0
+	mov r1, r3, lsr $3			@ move quotent back into r0
 	and r3, r3, $7				@ isolate remainder 
 	add r3, r3, lsl $2			@ r = r *5 << 3
 	movs r3, r3, lsr $2			@ r = r*2 >>3
 	movccs r2, r2, lsl $1			@ test if rounding correction needed 
 	adc r3, r3, $0				@ the remainder
 
-	cmp r0, $10
+	cmp r1, $10
 	bpl _DA
-	add r0, r0, $0x30
+	add r1, r1, $0x30
 	strb r0, [r12]
 	ldr r0, =AsciiBcd
 	bx lr
