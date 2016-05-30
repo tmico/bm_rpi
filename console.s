@@ -380,7 +380,8 @@ _DA:
 	bpl _DA
 	add r0, r0, $0x30
 	strb r0, [r12]
-	ldr r0, =AsciiBcd
+	mov r0, r12				@ r0; 1st char to pop here
+	ldr r1, =AsciiBcd			@ r1; last char to pop here
 	bx lr
 	
 _bin_asciidec_long:	
@@ -401,7 +402,7 @@ _bin_asciidec_long:
 	ldr lo10, =0xcccccccd
 	ldr r12, =AsciiBcd
 	sub hi10, lo10, $0x1
-	
+_DLA	
 	umull llo, lhi, r0, lo10
 	mov hlo, $0
 	umlal lhi, hlo, r0, hi10
@@ -421,9 +422,42 @@ _bin_asciidec_long:
 	movccs lhi, lhi, lsl $1			@ Correct rounding errors
 	adc scratch, scratch, $0
 	
+	/* 'convert into ascii and store */
+	add scratch, scratch, $0x30
+	strb scratch, [r12], $1
+
+	/* 'straighten' out hlo hhi (quotent) by >> 3 */ 
+	mov hlo, hlo, lsr $3
+	cmp hhi, $0
+	beq _DL1
+	and scratch, hhi, $7
+	orr r0, hlo, scratch ror $3
+	mov r1, hhi, lsr $3
+	b _DLA
+_DL1:
+	umull r2, r3, r0, r1		@TODO change registers
+	mov r0, r3, lsr $3			@ move quotent back into r0
+	and r3, r3, $7				@ isolate remainder 
+	add r3, r3, lsl $2			@ r = r *5 << 3
+	movs r3, r3, lsr $2			@ r = r*2 >>3
+	movccs r2, r2, lsl $1			@ test if rounding correction needed 
+	adc r3, r3, $0				@ the remainder
+
+	cmp r0, $10
+	bpl _DA
+	add r0, r0, $0x30
+	strb r0, [r12]
+	ldr r0, =AsciiBcd
+	bx lr
 	
-	
-	
+	.unreq lo10
+	.unreq hi10
+	.unreq llo
+	.unreq lhi
+	.unreq hlo
+	.unreq hhi
+	.unreq scratch
+
 	.data
 	.align 2
 
