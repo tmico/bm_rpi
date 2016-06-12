@@ -5,61 +5,100 @@
 .text
 	.align 2
 	.global _write_tfb
-	.global _print_tfb 
+	.global _display_tfb 
 	.global _kprint
 	
 
 _kprint:
 /* _kprint funtion - converts values for printing according to args given
-	and converts to ascii and stores in StdOut
-	_kprint is a variadic function. As such arguments given to it are
-	passed to it via the stack.
-	befor args are pushed onto the stack the sp is copied to r0.
-	r1 hold the addr of last arg on the stack. Thus r0 will be copied back
-	to sp before returning from _kprint
-	1st byte type	Meaning
-		c	single char
-		d	decimal int
-		b	binary int
-		f	float
-		s	string
-		x	hexadecimal
-	2nd byte type	Meaning
-		u	unsigned
-		l	long
+	and converts to ascii and stores in StdOut (Max size of StdOut is 1024 char)
+	_kprint is a variadic function. 
+	place holder	Meaning
+		%c	single char
+		%d	decimal int
+		%b	binary int
+		%f	float  ---> not yet implemented
+		%s	string
+		%x	hexadecimal
+	extra options	Meaning
+		%u*	unsigned, eg %ud -> unsigned decimal int 
+		%l*	long
 	
 */
-	sps .req r4		@ sp pre args (spstart)
-	spe .req r5		@ sp last arg
 
 	stmfd sp!, {r4 - r11}
-	mov sps, r0
-	mov spe, r1
+	add r11, sp, $32			@ set fp for args if any
+	ldrb r4, [r0], $1
+	ldr r5, =StdOut
+	mov r6, r0				@ copy addr of string input
+	mov r7, $1024				@ max char length counter
+	sub r7, r7, $1				@ make room for null char
+	
+_parse:
+	teq r4, $'%'				@ '%' a la printf()
+	beq _forsp				@ FORmatSPecifier
+	teq r4, $0				@ NULL terminator
+	subnes r7, r7, $1	
+	strneb r4, [r5], $1			@ strb to StdOut
+	ldrneb r4, [r6], $1			@ get new char
+	bne _parse
+	b _str_end
 
-	ldmfd spe!, {r3}			@ 1st arg is 'header'
-	and r2, r3, $0xf			@ issolate 1st byte to get type
-	cmp r2, $'d'
-	beq _intiger				@ Must be a better way than
-	cmp r2, $'s'				@  endless cmp!
+
+_forsp:
+	ldrb r4, [r6], $1
+	/* 2 cycle stall here to fix if poss */
+	cmp r4, $0x39
+	bls _spwidth
+ _for0:
+	cmp r4, $'d'
+	beq _integer				@ Must be a better way than
+	cmp r4, $'u'
+	beq _unsignedd
+	cmp r4, $'s'				@  endless cmp!
 	beq _string
-	cmp r2, $'c'
+	cmp r4, $'c'
 	beq _char
-	cmp r2, $'f'
-	beq _float
-	cmp r2, $'x'
+	@@ cmp r4, $'f'				@ not yet implimented
+	@@ beq _float
+	cmp r4, $'x'
 	beq _hex
-	cmp r2, $'b'
+	cmp r4, $'b'
+	beq _binary
+	strb r4, [r5], $1
+	ldrb r4, [r6], $1			@ get new char
+	bne _parse
+
+ _spwidth:
+	subs r8, r4, $0x30			@ block decides on space or 0
+	ldreq r8, [r6], $1			@  to be printed
+	movhi r4, $' '
+	moveq r4, $'0'
+	subeq r8, r8, $0x30
+ _Lfp:
+	strb r4, [r5], $1			@ loop to insert width
+	subs r7, r7, $1
+	subnes r8, r8, $1
+	bne _Lfp
+	ldr r4, [r6], $1
+	b _for0
+
 _binary:	
-_intiger:	
+_integer:	
+_unsignedd:
 _string:	
 _char:	
 _float:	
 _hex:	
-	.unreq sps
-	.unreq spe
+_str_end:	
+	mov r4 ,$0	
+	strb r4, [r5] 			@ ensure there is a NULL
+
 _write_tfb:
 	/*_write_tfb will take a string (ascii) passed stored in StdOut
 	 *  of a mem address in r1, the number of chars to be printed in r2
+	 * r0 is unused as if _wirte_tbf will ever be used in a syscall
+	 * (future) then r0 would be used to hold the file descriptor.
 	 */
 
 	tb .req r4				@ terminal buffer
@@ -111,7 +150,7 @@ _next_line:
 	ldrb char, [in], $1
 	b _WT0
 _zero:
-	cmp char, $0
+	cmp char, $0				@ ensure null terminator present
 	movne char, $0
 	strneb char, [tba]
 
@@ -149,8 +188,8 @@ _exit0:
 	.unreq noc
 	.unreq char
 	.unreq tba
-_print_tfb:			@ Funtional code to start. TODO colour support
-/* _print_tfb prints the content of TermBuffer within the range of
+_display_tfb:			@ Funtional code to start. TODO colour support
+/* _display_tfb prints the content of TermBuffer within the range of
  *	TermScreen. TermScreen is what is displayed on screen but is
  *	itself just two pointers; a first line and last line that is to be 
  *	printed.
@@ -362,6 +401,7 @@ _bin_asciidec:
 	 * each 4bit bcd, but as much as i love the algorithm its way to slow
 	 * for 32 bits so instead its div by 10, convert remainder to ascii
 	 * store and repeat by div quotant and convert remainder.
+	 * routine returns r0 pointer to 1st B to pop, r1 pointer to last B
 	*/
 	ldr r1, =0xcccccccd			@ 1/10 << 35
 	ldr r12, =AsciiBcd 
@@ -401,8 +441,10 @@ _bin_asciidec_long:
 	stmfd sp!, {r4 -r8}
 	ldr lo10, =0xcccccccd
 	ldr r12, =AsciiBcd
+	cmp r1, $0				@ see if can skip to 32bit mul
+	beq _DL0
 	sub hi10, lo10, $0x1
-_DLA	
+_DLA:
 	umull llo, lhi, r0, lo10
 	mov hlo, $0
 	umlal lhi, hlo, r0, hi10
@@ -412,6 +454,7 @@ _DLA
 	adds hlo, hlo, scratch
 	adc hhi, hhi, hhi
 	umlal hlo, hhi, r1, hi10
+
 	/* After the above routine the remainder is in
 	llo lhi and least significant 3 bits of hlo.
 	(you can imagine the point was between r5 r6 and has been << 3 places)
@@ -426,29 +469,36 @@ _DLA
 	add scratch, scratch, $0x30
 	strb scratch, [r12], $1
 
-	/* 'straighten' out hlo hhi (quotent) by >> 3 */ 
-	mov hlo, hlo, lsr $3
-	cmp hhi, $0
-	beq _DL1
-	and scratch, hhi, $7
-	orr r0, hlo, scratch ror $3
-	mov r1, hhi, lsr $3
-	b _DLA
-_DL1:
-	mov r0, lo10
-	umull r2, r3, r0, r1		@TODO change registers
-	mov r1, r3, lsr $3			@ move quotent back into r0
+	/* 'straighten' out hlo hhi (quotent) by >> 3 and putting them in r0:r1*/ 
+	mov r0, hlo, lsr $3
+	ands scratch, hhi, $7
+	orrne r0, r0, scratch, ror $3
+	movs r1, hhi, lsr $3
+	bne _DLA
+_DL0:
+	mov r1, lo10
+	ldmfd sp!, {r4 -r8}			@ Normally I would have this just 
+						@  before returning from routine
+						@  but as this is soo time consuming
+						@  having this instruction here
+						@  shaves a few cpu cycles!!
+_DL1:	
+	umull r2, r3, r0, r1		
+	mov r0, r3, lsr $3			@ move quotent back into r0
 	and r3, r3, $7				@ isolate remainder 
 	add r3, r3, lsl $2			@ r = r *5 << 3
 	movs r3, r3, lsr $2			@ r = r*2 >>3
 	movccs r2, r2, lsl $1			@ test if rounding correction needed 
 	adc r3, r3, $0				@ the remainder
-
-	cmp r1, $10
-	bpl _DA
-	add r1, r1, $0x30
+	
+	add r3, r3, $0x30
+	strb r3, [r12], $1
+	cmp r0, $10
+	bpl _DL1
+	add r0, r1, $0x30
 	strb r0, [r12]
-	ldr r0, =AsciiBcd
+	mov r0, r12				@ pointer to 1st char to pop
+	ldr r1, =AsciiBcd			@ pointer off last char to pop
 	bx lr
 	
 	.unreq lo10
