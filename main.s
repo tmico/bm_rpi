@@ -124,11 +124,11 @@ _set_fb_colour:
 	/* Display welcome text */
 	ldr r1, =Text1
 	ldr r2, =Text1lng	
-	bl _write_tfb
+	bl _display_tfb
 	
 	cmp r0, $0
 	blne _clrscr_dma0				
-	bl _print_tfb		@ Funtional _print_buffer
+	bl _display_tfb				@ Funtional _print_buffer
 
 	/* routine to move around the screen fabienne's pic*/
 _L0:
