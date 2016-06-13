@@ -74,12 +74,12 @@ _forsp:
 	ldreq r8, [r6], $1			@  to be printed
 	movhi r4, $' '
 	moveq r4, $'0'
-	subeq r8, r8, $0x30
+	subeqs r8, r8, $0x30
  _Lfp:
-	strb r4, [r5], $1			@ loop to insert width
+	strgtb r4, [r5], $1			@ loop to insert width
 	subs r7, r7, $1
 	subnes r8, r8, $1
-	bne _Lfp
+	bgt _Lfp				@ possiblly dealing with signed
 	ldr r4, [r6], $1
 	b _for0
 
