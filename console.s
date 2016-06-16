@@ -26,8 +26,8 @@ _kprint:
 	
 */
 
-	stmfd sp!, {r4 - r11}
-	add r11, sp, $32			@ set fp for args if any
+	stmfd sp!, {r1 - r3}			@ str args for easy access
+	stmfd sp!, {r4 - r10, lr}
 	ldrb r4, [r0], $1
 	ldr r5, =StdOut
 	mov r6, r0				@ copy addr of string input
@@ -38,19 +38,26 @@ _parse:
 	teq r4, $'%'				@ '%' a la printf()
 	beq _forsp				@ FORmatSPecifier
 	teq r4, $0				@ NULL terminator
-	subnes r7, r7, $1	
 	strneb r4, [r5], $1			@ strb to StdOut
 	ldrneb r4, [r6], $1			@ get new char
+	subnes r7, r7, $1	
 	bne _parse
 	b _str_end
 
 
 _forsp:
 	ldrb r4, [r6], $1
-	/* 2 cycle stall here to fix if poss */
+	add r10, sp, $28			@ set fp for args if any
+	ldmfd r10!, r0				@ pop off 1st arg
+	/* This looks terrible and there's probably a better way but brain dead!
+	   chunk of code checks char after the '%' placeholder to assertain if
+	   width (0 or space) is required. problem lies that ascii numbers are
+	   bang in middle between some symbols and alpha char's. */
+	cmp r4, $0x30
+	blo _for1
 	cmp r4, $0x39
 	bls _spwidth
- _for0:
+_for0:
 	cmp r4, $'d'
 	beq _integer				@ Must be a better way than
 	cmp r4, $'u'
@@ -65,26 +72,33 @@ _forsp:
 	beq _hex
 	cmp r4, $'b'
 	beq _binary
+_for1:
 	strb r4, [r5], $1
 	ldrb r4, [r6], $1			@ get new char
 	bne _parse
 
- _spwidth:
-	subs r8, r4, $0x30			@ block decides on space or 0
-	ldreq r8, [r6], $1			@  to be printed
+_spwidth:
+	subs r2, r4, $0x30			@ block decides on space or 0
+	ldreq r2, [r6], $1			@  to be printed
 	movhi r4, $' '
 	moveq r4, $'0'
-	subeqs r8, r8, $0x30
- _Lfp:
-	strb r4, [r5], $1			@ loop to insert width
-	subs r7, r7, $1
-	subnes r8, r8, $1
-	bhi _Lfp				@ possiblly dealing with signed
-	ldr r4, [r6], $1
+	subeqs r2, r2, $0x30
+_Lfp:
+	strhib r4, [r5], $1			@ loop to insert width
+	subhis r7, r7, $1
+	subhis r2, r2, $1
+	bhi _Lfp
+	ldrb r4, [r6], $1
 	b _for0
 
 _binary:	
 _integer:	
+	tst r0, $(1<<31)			@ tst sign
+	rsbmi r0, r0, $0			@ get 2's compliment if n = 1
+	movmi r4, $'-'
+	strmib r4, [r5], $1
+	submis r7, r7, $1
+	
 _unsignedd:
 _string:	
 _char:	
