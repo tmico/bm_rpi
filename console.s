@@ -48,7 +48,7 @@ _parse:
 _forsp:
 	ldrb r4, [r6], $1
 	add r10, sp, $28			@ set fp for args if any
-	ldmfd r10!, r0				@ pop off 1st arg
+	ldmfd r10!, {r0}				@ pop off 1st arg
 	/* This looks terrible and there's probably a better way but brain dead!
 	   chunk of code checks char after the '%' placeholder to assertain if
 	   width (0 or space) is required. problem lies that ascii numbers are
@@ -93,11 +93,15 @@ _Lfp:
 
 _binary:	
 _integer:	
+	subs r7, r7, $1
+	beq _str_end
 	tst r0, $(1<<31)			@ tst sign
-	rsbmi r0, r0, $0			@ get 2's compliment if n = 1
-	movmi r4, $'-'
-	strmib r4, [r5], $1
-	submis r7, r7, $1
+	rsbne r0, r0, $0			@ get 2's compliment if n = 1
+	movne r4, $'-'
+	strneb r4, [r5], $1
+	bl _bin_asciidec
+	
+	
 	
 _unsignedd:
 _string:	
@@ -426,7 +430,7 @@ _DA:
 	add r3, r3, lsl $2			@ r = r *5 << 3
 	movs r3, r3, lsr $2			@ r = r*2 >>3
 	movccs r2, r2, lsl $1			@ test if rounding correction needed 
-	addcs r3, r3, $1			@ the remainder
+	addcs r3, r3, $1				@ the remainder
 	/* 'convert into ascii and store */
 	add r3, r3, $0x30
 	strb r3, [r12], $1
