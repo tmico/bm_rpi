@@ -1,4 +1,4 @@
-/*
+/*TOD0
  *
  */
 	
@@ -33,6 +33,7 @@ _kprint:
 	mov r6, r0				@ copy addr of string input
 	mov r7, $1024				@ max char length counter
 	sub r7, r7, $1				@ make room for null char
+	add r10, sp, $28			@ set fp for args if any
 	
 _parse:
 	teq r4, $'%'				@ '%' a la printf()
@@ -47,16 +48,13 @@ _parse:
 
 _forsp:
 	ldrb r4, [r6], $1
-	add r10, sp, $28			@ set fp for args if any
-	ldmfd r10!, {r0}				@ pop off 1st arg
+	mov r8, $2				@ counter for _for0
+	mov r9, $0				@ deleting stale values
+	mov r3, $0				@ deleting stale values
 	/* This looks terrible and there's probably a better way but brain dead!
 	   chunk of code checks char after the '%' placeholder to assertain if
 	   width (0 or space) is required. problem lies that ascii numbers are
 	   bang in middle between some symbols and alpha char's. */
-	cmp r4, $0x30
-	blo _for1
-	cmp r4, $0x39
-	bls _spwidth
 _for0:
 	cmp r4, $'d'
 	beq _integer				@ Must be a better way than
@@ -72,6 +70,10 @@ _for0:
 	beq _hex
 	cmp r4, $'b'
 	beq _binary
+	cmp r4, $0x30
+	blo _for1
+	cmp r4, $0x39
+	bls _spwidth
 _for1:
 	strb r4, [r5], $1
 	ldrb r4, [r6], $1			@ get new char
@@ -79,29 +81,49 @@ _for1:
 
 _spwidth:
 	subs r2, r4, $0x30			@ block decides on space or 0
-	ldreq r2, [r6], $1			@  to be printed
-	movhi r4, $' '
-	moveq r4, $'0'
-	subeqs r2, r2, $0x30
-_Lfp:
-	strhib r4, [r5], $1			@ loop to insert width
-	subhis r7, r7, $1
-	subhis r2, r2, $1
-	bhi _Lfp
+	cmpeq r9, $0
+	moveq r9, $'0'
+	addeq r8, r8, $1
+	cmp r9, $0
+	moveq r9, $' '
+	subs r8, r8, $1
+	orrne r3, r2, r3, lsl $4		@ creating packed bcd
 	ldrb r4, [r6], $1
 	b _for0
 
+
 _binary:	
 _integer:	
-	subs r7, r7, $1
-	beq _str_end
-	tst r0, $(1<<31)			@ tst sign
-	rsbne r0, r0, $0			@ get 2's compliment if n = 1
-	movne r4, $'-'
-	strneb r4, [r5], $1
+	ldmfd r10!, {r0}			@ pop off 1st arg
+	mov r4, r9
+	mov r9, r3
+	ands r8, r0, $(1<<31)			@ preserve sign bit
+	rsbmi r0, r0, $0			@ get 2's compliment if n = 1
 	bl _bin_asciidec
+
+	tst r8, $(1<<31)
+	movmi r3, $'-'
+	strmib r3, [r0], $1			@ adding sign to number string
+	sub r2, r0, r1
+	subs r3, r9, r2				@ MIN v actual number width
+	movcs r2, r9
+	subs r7, r7, r2				@ make sure there's enough space
+	beq _str_end
 	
-	
+_int0:	
+	subs r3, r3, $1				@ insert 'spacers' if needed
+	strplb r4, [r5], $1
+	bpl _int0 				@ loop
+
+	ldrneb r4, [r0], $-1
+
+_int1:
+	strb r4, [r5], $1
+	subs r2, r2, $1				@ counter
+	ldrneb r4, [r0], $-1
+	bne _int1
+	ldrb r4, [r6], $1
+	b _parse
 	
 _unsignedd:
 _string:	
@@ -527,7 +549,24 @@ _DL1:
 	.unreq hhi
 	.unreq scratch
 
-	.data
+_ascii_bin:
+	/* routine to 'convert' ascii numbers into bin. At this point its here to
+	 * enable the _kprint function to us ascii numbers as format specifiers
+	 * (ie ("Some text, %123d then more text") where 123 is the format width
+	 * a pain in the a%^$ to do but hopefully worth it ?!
+	 * arg passed in r0. limited to 4 byte number
+	*/
+	and r2, r0, $0xff000000			@ mask msB
+	mov r1, r2, lsr $21			@ effect of moving to bit [7:0]
+						@  and * 8 (lsl 3)
+	add r1, r1, r2, lsr $23			@ overall effect of * 10
+
+	and r2 ,r0, $0xff0000  
+	
+	
+	
+
+	.DATA
 	.align 2
 
 AsciiBin:	
