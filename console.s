@@ -1,18 +1,18 @@
 /*TOD0
  *
  */
-	
+
 .text
 	.align 2
 	.global _write_tfb
-	.global _display_tfb 
+	.global _display_tfb
 	.global _kprint
-	
+
 
 _kprint:
 /* _kprint funtion - converts values for printing according to args given
 	and converts to ascii and stores in StdOut (Max size of StdOut is 1024 char)
-	_kprint is a variadic function. 
+	_kprint is a variadic function.
 	place holder	Meaning
 		%c	single char
 		%d	decimal int
@@ -21,9 +21,9 @@ _kprint:
 		%s	string
 		%x	hexadecimal
 	extra options	Meaning
-		%u*	unsigned, eg %ud -> unsigned decimal int 
+		%u*	unsigned, eg %ud -> unsigned decimal int
 		%l*	long
-	
+
 */
 
 	stmfd sp!, {r1 - r3}			@ str args for easy access
@@ -34,50 +34,83 @@ _kprint:
 	mov r7, $1024				@ max char length counter
 	sub r7, r7, $1				@ make room for null char
 	add r10, sp, $28			@ set fp for args if any
-	
+
 _parse:
 	teq r4, $'%'				@ '%' a la printf()
 	beq _forsp				@ FORmatSPecifier
 	teq r4, $0				@ NULL terminator
 	strneb r4, [r5], $1			@ strb to StdOut
-	ldrneb r4, [r6], $1			@ get new char
-	subnes r7, r7, $1	
+	subnes r7, r7, $1
 	bne _parse
 	b _str_end
 
 
 _forsp:
 	ldrb r4, [r6], $1
-	mov r8, $2				@ counter for _for0
 	mov r9, $0				@ deleting stale values
+	mov r8, $2				@ counter for _for0
 	mov r3, $0				@ deleting stale values
 	/* This looks terrible and there's probably a better way but brain dead!
 	   chunk of code checks char after the '%' placeholder to assertain if
 	   width (0 or space) is required. problem lies that ascii numbers are
 	   bang in middle between some symbols and alpha char's. */
 _for0:
-	cmp r4, $'d'
-	beq _integer				@ Must be a better way than
-	cmp r4, $'u'
-	beq _unsignedd
-	cmp r4, $'s'				@  endless cmp!
-	beq _string
-	cmp r4, $'c'
-	beq _char
-	@@ cmp r4, $'f'				@ not yet implimented
-	@@ beq _float
-	cmp r4, $'x'
-	beq _hex
-	cmp r4, $'b'
-	beq _binary
+	/* below is a switch(c) block of code */
+	cmp r4, $0x78				@ cmp ascii 'x'
+	bhi _for1
+	ldr r0, =Jumptable
+	subs r1, r4, $0x61
+	movpl r1, r1, lsl $2
+	ldrpl pc, [r0, r1]
 	cmp r4, $0x30
 	blo _for1
 	cmp r4, $0x39
 	bls _spwidth
+	ldrb r4, [r6], $1			@ get new char
+	b _parse
+
+	.data
+	.align 2
+	/* non global jump table to deal with the switch involved in type of
+	 * format after the '%' placeholder. takes up more space but less clunky
+	 * than endless cmp instructions.
+	*/
+Jumptable:
+	.word	 _parse @a
+	.word	_binary
+	.word	_char
+	.word	_integer
+	.word	_parse @e
+	.word	_parse @f
+	.word	_parse @g
+	.word	_parse @h
+	.word	_parse @i
+	.word	_parse @j
+	.word	_parse @k
+	.word	_parse @l
+	.word	_parse @m
+	.word	_parse @n
+	.word	_parse @o
+	.word	_parse @p
+	.word	_parse @q
+	.word	_parse @r
+	.word	_parse @s
+	.word	_parse @t
+	.word	_parse @u
+	.word	_parse @v
+	.word	_parse @w
+	.word	_parse @x
+	.word	_parse @y
+
+	.text
+	.align 2
+
 _for1:
 	strb r4, [r5], $1
-	ldrb r4, [r6], $1			@ get new char
+	subs r7, r7, $1				@ adjust remaining space on StdOut
+	ldrneb r4, [r6], $1			@ get new char
 	bne _parse
+	b _str_end
 
 _spwidth:
 	subs r2, r4, $0x30			@ block decides on space or 0
@@ -92,8 +125,16 @@ _spwidth:
 	b _for0
 
 
-_binary:	
-_integer:	
+_binary:
+	mov r4, r9
+	mov r9, r3				@
+	ldmfd r10!, {r0}
+ 	bl _bin_asciibin
+	subs r3, r9, r1
+
+
+
+_integer:
 	ldmfd r10!, {r0}			@ pop off 1st arg
 	mov r4, r9
 	mov r9, r3
@@ -109,13 +150,14 @@ _integer:
 	movcs r2, r9
 	subs r7, r7, r2				@ make sure there's enough space
 	beq _str_end
-	
-_int0:	
-	subs r3, r3, $1				@ insert 'spacers' if needed
-	strplb r4, [r5], $1
-	bpl _int0 				@ loop
 
-	ldrneb r4, [r0], $-1
+	subs r3, r3, $1				@ insert 'spacers' if needed
+_int0:	
+	strgtb r4, [r5], $1
+	subs r3, r3, $1				@ insert 'spacers' if needed
+	bgt _int0 				@ loop
+
+	ldrb r4, [r0], $-1
 
 _int1:
 	strb r4, [r5], $1
@@ -124,14 +166,14 @@ _int1:
 	bne _int1
 	ldrb r4, [r6], $1
 	b _parse
-	
+
 _unsignedd:
-_string:	
-_char:	
-_float:	
-_hex:	
-_str_end:	
-	mov r4 ,$0	
+_string:
+_char:
+_float:
+_hex:
+_str_end:
+	mov r4 ,$0
 	strb r4, [r5] 			@ ensure there is a NULL
 
 _write_tfb:
