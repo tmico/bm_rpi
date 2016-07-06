@@ -49,7 +49,8 @@ _forsp:
 	ldrb r4, [r6], $1
 	mov r9, $0				@ deleting stale values
 	mov r8, $2				@ counter for _for0
-	mov r3, $0				@ deleting stale values
+	mov r1, $10				@ convert from bcd to binary
+	mov r11, $0				@ deleting stale values
 	/* This looks terrible and there's probably a better way but brain dead!
 	   chunk of code checks char after the '%' placeholder to assertain if
 	   width (0 or space) is required. problem lies that ascii numbers are
@@ -100,7 +101,6 @@ Jumptable:
 	.word	_parse @v
 	.word	_parse @w
 	.word	_parse @x
-	.word	_parse @y
 
 	.text
 	.align 2
@@ -114,13 +114,14 @@ _for1:
 
 _spwidth:
 	subs r2, r4, $0x30			@ block decides on space or 0
+	mla r3, r1, r11, r2
 	cmpeq r9, $0
 	moveq r9, $'0'
 	addeq r8, r8, $1
 	cmp r9, $0
 	moveq r9, $' '
 	subs r8, r8, $1
-	orrne r3, r2, r3, lsl $4		@ creating packed bcd
+	mov r11, r3				@ preserve for next loop
 	ldrb r4, [r6], $1
 	b _for0
 
@@ -149,10 +150,10 @@ _integer:
 	subs r3, r9, r2				@ MIN v actual number width
 	movcs r2, r9
 	subs r7, r7, r2				@ make sure there's enough space
-	beq _str_end
+	ble _str_end
 
 	subs r3, r3, $1				@ insert 'spacers' if needed
-_int0:	
+_int0:
 	strgtb r4, [r5], $1
 	subs r3, r3, $1				@ insert 'spacers' if needed
 	bgt _int0 				@ loop
