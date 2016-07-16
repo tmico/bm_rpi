@@ -20,13 +20,14 @@ _kprint:
 		%f	float  ---> not yet implemented
 		%s	string
 		%x	hexadecimal
-	extra options	Meaning
-		%u*	unsigned, eg %ud -> unsigned decimal int
-		%l*	long
+		%u	unsigned
+		%l	long (64 bit)
 
 */
-
-	stmfd sp!, {r1 - r3}			@ str args for easy access
+, eg %ud -> unsigned decimal int
+	stmfd sp!, {r3}				@ str args for easy access
+	stmfd sp!, {r2}				@ str args for easy access
+	stmfd sp!, {r1}				@ str args for easy access
 	stmfd sp!, {r4 - r10, lr}
 	ldrb r4, [r0], $1
 	ldr r5, =StdOut
@@ -47,28 +48,31 @@ _parse:
 
 _forsp:
 	ldrb r4, [r6], $1
+	ldr r0, =Jumptable
 	mov r9, $0				@ deleting stale values
-	mov r8, $2				@ counter for _for0
-	mov r1, $10				@ convert from bcd to binary
-	mov r11, $0				@ deleting stale values
+	mov r8, $0				@ deleting stale values
+	mov r1, $10				@ convert from binary to bcd
 	/* This looks terrible and there's probably a better way but brain dead!
 	   chunk of code checks char after the '%' placeholder to assertain if
 	   width (0 or space) is required. problem lies that ascii numbers are
 	   bang in middle between some symbols and alpha char's. */
 _for0:
 	/* below is a switch(c) block of code */
-	cmp r4, $0x78				@ cmp ascii 'x'
-	bhi _for1
-	ldr r0, =Jumptable
-	subs r1, r4, $0x61
-	movpl r1, r1, lsl $2
-	ldrpl pc, [r0, r1]
-	cmp r4, $0x30
-	blo _for1
-	cmp r4, $0x39
-	bls _spwidth
-	ldrb r4, [r6], $1			@ get new char
-	b _parse
+	bic r1, r4, $0xa0			@ clear to 'switch' case of char
+	subs r1, r1, $0x41			@ 'A' == 0, 'B' == 1, etc ...
+	movpl r1, r1, lsl $2			@ * 4 to word align
+	ldrpl pc, [r0, r1]			@ branch to correct %d,b,x
+						@ if not valid then ...
+	subs r2, r4, $0x30			@ block decides on space or 0
+	bmi _for1
+	mla r3, r1, r8, r2			@ convert ascii to binary
+	cmpeq r9, $0				@ r9 will hold ' ' or '0'
+	moveq r9, $'0'
+	cmp r9, $0
+	moveq r9, $' '
+	mov r8, r3				@ preserve for next loop
+	ldrb r4, [r6], $1
+	b _for0
 
 	.data
 	.align 2
@@ -77,30 +81,36 @@ _for0:
 	 * than endless cmp instructions.
 	*/
 Jumptable:
-	.word	 _parse @a
+	.word	 _for2 @a
 	.word	_binary
 	.word	_char
 	.word	_integer
-	.word	_parse @e
-	.word	_parse @f
-	.word	_parse @g
-	.word	_parse @h
-	.word	_parse @i
-	.word	_parse @j
-	.word	_parse @k
-	.word	_parse @l
-	.word	_parse @m
-	.word	_parse @n
-	.word	_parse @o
-	.word	_parse @p
-	.word	_parse @q
-	.word	_parse @r
-	.word	_parse @s
-	.word	_parse @t
-	.word	_parse @u
-	.word	_parse @v
-	.word	_parse @w
-	.word	_parse @x
+	.word	_for2 @e
+	.word	_for2 @f
+	.word	_for2 @g
+	.word	_for2 @h
+	.word	_for2 @i
+	.word	_for2 @j
+	.word	_for2 @k
+	.word	_for2 @l
+	.word	_for2 @m
+	.word	_for2 @n
+	.word	_for2 @o
+	.word	_for2 @p
+	.word	_for2 @q
+	.word	_for2 @r
+	.word	_for2 @s
+	.word	_for2 @t
+	.word	_for2 @u
+	.word	_for2 @v
+	.word	_for2 @w
+	.word	_for2 @x
+	.word	_for2 @y
+	.word	_for2 @z
+	.word	_for2 @
+	.word	_for2 @
+	.word	_for2 @
+	.word	_for2 @
 
 	.text
 	.align 2
@@ -112,67 +122,91 @@ _for1:
 	bne _parse
 	b _str_end
 
-_spwidth:
-	subs r2, r4, $0x30			@ block decides on space or 0
-	mla r3, r1, r11, r2
-	cmpeq r9, $0
-	moveq r9, $'0'
-	addeq r8, r8, $1
-	cmp r9, $0
-	moveq r9, $' '
-	subs r8, r8, $1
-	mov r11, r3				@ preserve for next loop
-	ldrb r4, [r6], $1
-	b _for0
-
-
-_binary:
-	mov r4, r9
-	mov r9, r3				@
-	ldmfd r10!, {r0}
- 	bl _bin_asciibin
-	subs r3, r9, r1
-
-
-
-_integer:
-	ldmfd r10!, {r0}			@ pop off 1st arg
-	mov r4, r9
-	mov r9, r3
-	ands r8, r0, $(1<<31)			@ preserve sign bit
-	rsbmi r0, r0, $0			@ get 2's compliment if n = 1
-	bl _bin_asciidec
-
-	tst r8, $(1<<31)
-	movmi r3, $'-'
-	strmib r3, [r0], $1			@ adding sign to number string
-	sub r2, r0, r1
-	subs r3, r9, r2				@ MIN v actual number width
-	movcs r2, r9
-	subs r7, r7, r2				@ make sure there's enough space
-	ble _str_end
-
-	subs r3, r3, $1				@ insert 'spacers' if needed
-_int0:
-	strgtb r4, [r5], $1
-	subs r3, r3, $1				@ insert 'spacers' if needed
-	bgt _int0 				@ loop
-
-	ldrb r4, [r0], $-1
-
-_int1:
-	strb r4, [r5], $1
-	subs r2, r2, $1				@ counter
-	ldrneb r4, [r0], $-1
-	bne _int1
+_for2:						@ going back to _parse
 	ldrb r4, [r6], $1
 	b _parse
 
+
+
+_binary:
+	ldmfd r10!, {r0}
+	ldr lr, =_ins_var
+ 	b _bin_asciibin
+
+_integer:
+	ldmfd r10!, {r0}			@ pop off arg
+	ldr lr, =_ins_var
+	mov r3, $'-'
+	teq r0, $(1<<31)			@ xor allows beq to work later
+	rsbpl r0, r0, $0			@ get 2's compliment if n = 1
+	strplb r3, [r5], $1			@  (note teq 1<<31 will reverse
+						@	n flag, think about it)
+	subpls r7, r7, $1 
+	beq _str_end
+	b _bin_asciidec
+
 _unsignedd:
+	ldmfd r10!, {r0}
+	ldr lr, =_ins_var
+	b _bin_asciidec
+
+
 _string:
+	ldmfd r10!, {r0}
+	rsb r7, r7, $0				@ 2's compl to tst against the n
+						@  flag. save on an extra cmp
+	ldrb r1, [r0], $1
+_S0:
+	teq r1, $0				@ tst if 0 without setting c flag
+	addnes r7, r7, $1			@ all time n flag set its ok
+	strneb r1, [r5], $1
+	ldrneb r1, [r0], $1
+	bne _S0					@ if r1 | r7 != 0 then b to _S0
+	rsbcc r7, r7, $0			@ convert back from 2's compl
+	ldrccb r4, [r6], $1			@ if c =1 then r7 added up to 0
+	bcc _parse
+	b _str_end
+
+
+
 _char:
-_float:
+	ldmfd r10!, {r0}
+	ldrb r4, [r0]
+	strb r1, [r5], $1
+	subs r7, r7, $1
+	beq _str_end
+	ldrb r4, [r6], $1
+	b _parse
+
+_float:	@ doubtfull it would be of any use but usefull excercise to impliment
 _hex:
+	ldmfd r10!, {r0}
+	ldr lr, =_ins_var
+	b _bin_asciihex
+
+_ins_var:
+	sub r2, r0, r1				@ get number of chars to print
+	subs r3, r8, r2				@ spwidth v actual number width
+	movhi r2, r8
+	subs r7, r7, r2
+	ble _str_end
+
+	subs r3, r3, $1
+_inv0:
+	strgeb r9, [r5], $1
+	subs r3, r3, $1
+	bge _inv0
+
+	ldrb r4, [r0], $-1
+
+_inv1:
+	strb r4, [r6], $1
+	subs r2, r2, $1
+	ldrneb r4, [r0], $-1
+	bne _inv1
+	ldrb r4, [r6], $1
+	b _parse
+
 _str_end:
 	mov r4 ,$0
 	strb r4, [r5] 			@ ensure there is a NULL
@@ -203,7 +237,7 @@ _write_tfb:
 
 	ldrb char, [in], $1
 	sub y, y, $44				@ no of lines left.
-						 
+ 
 	add tba, x, tc, lsl $6			@ tx * 80 + tc = tb char addr
 	add tba, tba, tc, lsl $4 
 	add tba, tba, tb
@@ -411,71 +445,48 @@ _F4:
 .unreq gadr
 .unreq bmap
 .unreq c16
-	
+
 _bin_asciihex:
 	/* binary to hex in assci converter. Converts value in r0 to hex
-	 * Returns ascii coded value in r0-r1 (lsbyte in lsreg)	As such
-	 * it can return a max value of 0xFFFFFFFF which should be enough
-	 * as the pi is a 32bit system there is nothing to be gained from
+	 * Returns ascii coded value in memory location AsciiDigit.
+	 * R0 holds pointer to first char to be printed. r1 holds base
+	 * address which will also be the last char. note data is stored
+	 * in a decrement array ***  make sure to DECREMENT the address ***
 	* from any higher value (for this very basic os!) */
-
-	mov r12, r0				@ copy to work from
-	
-	eor r0, r0, r0
-	eor r1, r1, r1
-	mov r3, $0x04				@ 4 x loop counter
-	
+	ldr r12, =BinHexTable			@ load table with ascii char set
+	ldr r3, =AsciiDigit			@ AsciiDigit array holding char
+	and r1, r0, $0xf
+	ldrb r2, [r12, r1]
 _BH0:
-	and r2, r12, $0x0f
-	cmp r2, $0xa
-	addmi r2, r2, $0x30			@ if 0-9
-	addpl r2, r2, $0x38			@ if 10-16
-	orr r0, r0, r2
-	ror r0, r0, $0x08			@ The author is proud of this little idea!!!
-
-	mov r12, r12, lsr $4			@ shift down for nxt and
-	subs r3, r3, $0x01
+	strb r2, [r3], $1
+	movs r0, r0, lsr $4
+	andne r1, r0, $0xf
+	ldrneb r2, [r12, r1]
 	bne _BH0
-	mov r3, $0x04				@ 4 x loop counter
-_BH1:						@ repeat of code but for
-	and r2, r12, $0x0f			@  hi bits
-	cmp r2, $0xa
-	addmi r2, r2, $0x30			@ if 0-9
-	addpl r2, r2, $0x38			@ if 10-16
-	orr r1, r1, r2
-	ror r1, r1, $0x08
 	
-	mov r12, r12, lsr $4
-	subs r3, r3, $0x01
-	bne _BH1
+	mov r0, r3
+	ldr r1, =AsciiDigit
 	bx lr
 
-_bin_asciibin:	
+_bin_asciibin:
 	/* _bin_asciibin converts 1 word (4bytes) value into an ascii string
 	 * of a binary number. The value to be converted is passed via r0.
 	 * The return string being potentially too long to return in r0-r3 is
 	 * instead passed via a pointer to a mem location (AsciiBin). R0 holds
-	 * the pointer, r1 the n.o char in the string. The max being 32.   */
-	ldr r12, =AsciiBin
-	clz r1, r0
-	rsb r1, r1, $32				@ n.o chars
-	mov r2, $31				/* Store multiple data in
-						 * single registor to save having
-						 * to push one on the stack
-						 * The hi value is a counter
-						 * Lo value is ascii '0'	*/
-
-	mov r2, r2, lsl $16			@  as r2:lo holds value
-	orr r2, r2, $0x30			@ ascii '0'
+	 * the pointer to 1st char to be poped (1st char at hi address last char at
+	 * lo address) r1 the base address. (r0 - r1 = n.o char) */
+	ldr r12, =AsciiDigit
+	mov r2, $0x30				@ ascii '0'
 	mov r3, $0x31				@ ascii '1'
+	movs r0, r0, lsr $1
 _BA:
-	movs r0, r0, lsl #1			@ if cs then '1' else '0'
 	strccb r2, [r12], #1
 	strcsb r3, [r12], #1
-	subs r2, r2, $(1<<16)
-	bpl _BA
-	sub r0, r12, $33			@ faster than ldr
-	bx lr 
+	movs r0, r0, lsr $1
+	bne _BA
+	mov r0, r12
+	ldr r1, =AsciiDigit
+	bx lr
 
 _bin_asciidec:
 	/* Convert binary number (=< 32bits) into ascii decimal values */
@@ -487,8 +498,8 @@ _bin_asciidec:
 	 * routine returns r0 pointer to 1st B to pop, r1 pointer to last B
 	*/
 	ldr r1, =0xcccccccd			@ 1/10 << 35
-	ldr r12, =AsciiBcd 
-_DA:	
+	ldr r12, =AsciiDigit 
+_DA:
 	umull r2, r3, r0, r1
 	mov r0, r3, lsr $3			@ move quotent back into r0
 	and r3, r3, $7				@ isolate remainder 
@@ -504,10 +515,10 @@ _DA:
 	add r0, r0, $0x30
 	strb r0, [r12]
 	mov r0, r12				@ r0; 1st char to pop here
-	ldr r1, =AsciiBcd			@ r1; last char to pop here
+	ldr r1, =AsciiDigit			@ r1; last char to pop here
 	bx lr
-	
-_bin_asciidec_long:	
+
+_bin_asciidec_long:
 	/* Convert a 64 bit binary number into ascii decimal values
 	   This routine make use of the 'multiply long accumalate' op in the
 	   arm11 unit. Neadless to say this is a time consumiing operation
@@ -520,10 +531,10 @@ _bin_asciidec_long:
 	hlo	.req r6			@ hi lo
 	hhi	.req r7			@ hi hi
 	scratch	.req r8			@ scratch
-	
+
 	stmfd sp!, {r4 -r8}
 	ldr lo10, =0xcccccccd
-	ldr r12, =AsciiBcd
+	ldr r12, =AsciiDigit
 	cmp r1, $0				@ see if can skip to 32bit mul
 	beq _DL0
 	sub hi10, lo10, $0x1
@@ -547,7 +558,7 @@ _DLA:
 	movs scratch, scratch, lsr $2
 	movccs lhi, lhi, lsl $1			@ Correct rounding errors
 	adc scratch, scratch, $0
-	
+
 	/* 'convert into ascii and store */
 	add scratch, scratch, $0x30
 	strb scratch, [r12], $1
@@ -565,15 +576,15 @@ _DL0:
 						@  but as this is soo time consuming
 						@  having this instruction here
 						@  shaves a few cpu cycles!!
-_DL1:	
-	umull r2, r3, r0, r1		
+_DL1:
+	umull r2, r3, r0, r1
 	mov r0, r3, lsr $3			@ move quotent back into r0
 	and r3, r3, $7				@ isolate remainder 
 	add r3, r3, lsl $2			@ r = r *5 << 3
 	movs r3, r3, lsr $2			@ r = r*2 >>3
 	movccs r2, r2, lsl $1			@ test if rounding correction needed 
 	adc r3, r3, $0				@ the remainder
-	
+
 	add r3, r3, $0x30
 	strb r3, [r12], $1
 	cmp r0, $10
@@ -581,9 +592,9 @@ _DL1:
 	add r0, r1, $0x30
 	strb r0, [r12]
 	mov r0, r12				@ pointer to 1st char to pop
-	ldr r1, =AsciiBcd			@ pointer off last char to pop
+	ldr r1, =AsciiDigit			@ pointer off last char to pop
 	bx lr
-	
+
 	.unreq lo10
 	.unreq hi10
 	.unreq llo
@@ -605,19 +616,32 @@ _ascii_bin:
 	add r1, r1, r2, lsr $23			@ overall effect of * 10
 
 	and r2 ,r0, $0xff0000  
-	
-	
-	
+
+
+
 
 	.DATA
 	.align 2
+BinHexTable:
+	.word '0'
+	.word '1'
+	.word '2'
+	.word '3'
+	.word '4'
+	.word '5'
+	.word '6'
+	.word '7'
+	.word '8'
+	.word '9'
+	.word 'A'
+	.word 'B'
+	.word 'C'
+	.word 'D'
+	.word 'E'
+	.word 'F'
 
-AsciiBin:	
+AsciiDigit:
 	.rept 0x20
-	.byte 0
-	.endr
-AsciiBcd:
-	.rept 0x16
 	.byte 0
 	.endr
 
