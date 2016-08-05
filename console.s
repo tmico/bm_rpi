@@ -24,7 +24,6 @@ _kprint:
 		%l	long (64 bit)
 
 */
-, eg %ud -> unsigned decimal int
 	stmfd sp!, {r3}				@ str args for easy access
 	stmfd sp!, {r2}				@ str args for easy access
 	stmfd sp!, {r1}				@ str args for easy access
@@ -33,8 +32,7 @@ _kprint:
 	ldr r5, =StdOut
 	mov r6, r0				@ copy addr of string input
 	mov r7, $1024				@ max char length counter
-	sub r7, r7, $1				@ make room for null char
-	add r10, sp, $28			@ set fp for args if any
+	add r10, sp, $32			@ set fp for args if any
 
 _parse:
 	teq r4, $'%'				@ '%' a la printf()
@@ -42,6 +40,7 @@ _parse:
 	teq r4, $0				@ NULL terminator
 	strneb r4, [r5], $1			@ strb to StdOut
 	subnes r7, r7, $1
+	ldrneb r4, [r6], $1
 	bne _parse
 	b _str_end
 
@@ -58,11 +57,16 @@ _forsp:
 	   bang in middle between some symbols and alpha char's. */
 _for0:
 	/* below is a switch(c) block of code */
-	bic r1, r4, $0xa0			@ clear to 'switch' case of char
-	subs r1, r1, $0x41			@ 'A' == 0, 'B' == 1, etc ...
-	movpl r1, r1, lsl $2			@ * 4 to word align
-	ldrpl pc, [r0, r1]			@ branch to correct %d,b,x
-						@ if not valid then ...
+	cmp r4, $0x39
+	bic r3, r4, $0xe0			@ clear to 'switch' case of char
+	addls pc, pc, $0x14
+	mov r1, r3, lsl $2			@ * 4 to word align
+	add r1, r1, r0
+	ldr r2, [r1]				@ branch to correct %d,b,x
+	ldmfd r10!, {r0}
+	ldr lr, =_ins_var
+	bx r2
+
 	subs r2, r4, $0x30			@ block decides on space or 0
 	bmi _for1
 	mla r3, r1, r8, r2			@ convert ascii to binary
@@ -81,6 +85,7 @@ _for0:
 	 * than endless cmp instructions.
 	*/
 Jumptable:
+	.word	 _for2 @0
 	.word	 _for2 @a
 	.word	_binary
 	.word	_char
@@ -99,12 +104,12 @@ Jumptable:
 	.word	_for2 @p
 	.word	_for2 @q
 	.word	_for2 @r
-	.word	_for2 @s
+	.word	_string @s
 	.word	_for2 @t
 	.word	_for2 @u
 	.word	_for2 @v
 	.word	_for2 @w
-	.word	_for2 @x
+	.word	_hex  @x
 	.word	_for2 @y
 	.word	_for2 @z
 	.word	_for2 @
@@ -129,13 +134,9 @@ _for2:						@ going back to _parse
 
 
 _binary:
-	ldmfd r10!, {r0}
-	ldr lr, =_ins_var
  	b _bin_asciibin
 
 _integer:
-	ldmfd r10!, {r0}			@ pop off arg
-	ldr lr, =_ins_var
 	mov r3, $'-'
 	teq r0, $(1<<31)			@ xor allows beq to work later
 	rsbpl r0, r0, $0			@ get 2's compliment if n = 1
@@ -146,20 +147,17 @@ _integer:
 	b _bin_asciidec
 
 _unsignedd:
-	ldmfd r10!, {r0}
-	ldr lr, =_ins_var
 	b _bin_asciidec
 
 
 _string:
-	ldmfd r10!, {r0}
 	rsb r7, r7, $0				@ 2's compl to tst against the n
 						@  flag. save on an extra cmp
 	ldrb r1, [r0], $1
 _S0:
 	teq r1, $0				@ tst if 0 without setting c flag
-	addnes r7, r7, $1			@ all time n flag set its ok
 	strneb r1, [r5], $1
+	addnes r7, r7, $1			@ all time n flag set its ok
 	ldrneb r1, [r0], $1
 	bne _S0					@ if r1 | r7 != 0 then b to _S0
 	rsbcc r7, r7, $0			@ convert back from 2's compl
@@ -170,24 +168,20 @@ _S0:
 
 
 _char:
-	ldmfd r10!, {r0}
-	ldrb r4, [r0]
-	strb r1, [r5], $1
 	subs r7, r7, $1
 	beq _str_end
 	ldrb r4, [r6], $1
+	strb r0, [r5], $1
 	b _parse
 
 _float:	@ doubtfull it would be of any use but usefull excercise to impliment
 _hex:
-	ldmfd r10!, {r0}
-	ldr lr, =_ins_var
 	b _bin_asciihex
 
 _ins_var:
 	sub r2, r0, r1				@ get number of chars to print
-	subs r3, r8, r2				@ spwidth v actual number width
-	movhi r2, r8
+	subs r3, r8, r2				@ fsp_width v actual number width
+	subhi r7, r7, r3
 	subs r7, r7, r2
 	ble _str_end
 
@@ -197,19 +191,28 @@ _inv0:
 	subs r3, r3, $1
 	bge _inv0
 
-	ldrb r4, [r0], $-1
+	ldrb r4, [r0, #-1]!
 
 _inv1:
-	strb r4, [r6], $1
+	strb r4, [r5], $1
 	subs r2, r2, $1
-	ldrneb r4, [r0], $-1
+	ldrneb r4, [r0, #-1]!
 	bne _inv1
 	ldrb r4, [r6], $1
 	b _parse
 
 _str_end:
-	mov r4 ,$0
+	mov r4, $0
 	strb r4, [r5] 			@ ensure there is a NULL
+	cmp r7, $0			@ reason why here? (space or null byte)
+	
+	movgt r0, $0
+	mvnle r0, $0
+	rsbgt r2, r7, $1024
+	ldrle r2, =BOLength
+	ldrgt r1, =StdOut
+	ldrle r1, =BufferOverflow
+	ldmfd sp!, {r4 - r10, pc}	@ return
 
 _write_tfb:
 	/*_write_tfb will take a string (ascii) passed stored in StdOut
@@ -236,12 +239,12 @@ _write_tfb:
 	ldr tc, [r12]
 
 	ldrb char, [in], $1
+	mov r12, $80				@ bytes per line
 	sub y, y, $44				@ no of lines left.
  
-	add tba, x, tc, lsl $6			@ tx * 80 + tc = tb char addr
-	add tba, tba, tc, lsl $4 
+	mla tba, tc, r12, x			@ char addr = curntline * 80 + x
 	add tba, tba, tb
-	rsb nx, x, $79				@ no spaces left
+	rsb nx, x, $79				@ n.o spaces left
 _WT0:	
 	cmp char, $0x20
 	strb char, [tba], $1
@@ -316,7 +319,7 @@ _display_tfb:			@ Funtional code to start. TODO colour support
 	tb .req r5				@ termial buffer 
 	x .req r6 				@ x [0-79]
 	y .req r7				@ y [0-44]
-	
+
 	stmfd sp!, {r4 - r11, lr}
 	ldr scratch, =TermCur
 	ldr tc, [scratch]
@@ -513,7 +516,7 @@ _DA:
 	cmp r0, $10
 	bpl _DA
 	add r0, r0, $0x30
-	strb r0, [r12]
+	strb r0, [r12], $1			@ still inc to have char n.o correct
 	mov r0, r12				@ r0; 1st char to pop here
 	ldr r1, =AsciiDigit			@ r1; last char to pop here
 	bx lr
@@ -590,6 +593,9 @@ _DL1:
 	cmp r0, $10
 	bpl _DL1
 	add r0, r1, $0x30
+	cmp r0, $10
+	bpl _DL1
+	add r0, r1, $0x30
 	strb r0, [r12]
 	mov r0, r12				@ pointer to 1st char to pop
 	ldr r1, =AsciiDigit			@ pointer off last char to pop
@@ -603,47 +609,37 @@ _DL1:
 	.unreq hhi
 	.unreq scratch
 
-_ascii_bin:
-	/* routine to 'convert' ascii numbers into bin. At this point its here to
-	 * enable the _kprint function to us ascii numbers as format specifiers
-	 * (ie ("Some text, %123d then more text") where 123 is the format width
-	 * a pain in the a%^$ to do but hopefully worth it ?!
-	 * arg passed in r0. limited to 4 byte number
-	*/
-	and r2, r0, $0xff000000			@ mask msB
-	mov r1, r2, lsr $21			@ effect of moving to bit [7:0]
-						@  and * 8 (lsl 3)
-	add r1, r1, r2, lsr $23			@ overall effect of * 10
-
-	and r2 ,r0, $0xff0000  
-
-
-
 
 	.DATA
 	.align 2
 BinHexTable:
-	.word '0'
-	.word '1'
-	.word '2'
-	.word '3'
-	.word '4'
-	.word '5'
-	.word '6'
-	.word '7'
-	.word '8'
-	.word '9'
-	.word 'A'
-	.word 'B'
-	.word 'C'
-	.word 'D'
-	.word 'E'
-	.word 'F'
+	.byte '0'
+	.byte '1'
+	.byte '2'
+	.byte '3'
+	.byte '4'
+	.byte '5'
+	.byte '6'
+	.byte '7'
+	.byte '8'
+	.byte '9'
+	.byte 'A'
+	.byte 'B'
+	.byte 'C'
+	.byte 'D'
+	.byte 'E'
+	.byte 'F'
 
 AsciiDigit:
 	.rept 0x20
 	.byte 0
 	.endr
+
+BufferOverflow:
+	.asciz "Max string length reached"
+BOLength= .-BufferOverflow
+	  
+
 
 	.global SystemFont
 SystemFont:
