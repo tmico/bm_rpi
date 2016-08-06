@@ -1,92 +1,67 @@
 	.section .init				@ initialize this section first
+/*
+	Instruction table to load into memory 0x00
+	The kernel is loaded to mem loc 0x8000. The arm system jumps to these
+	addresses when there is an exception:
+	0x00 : reset
+	0x04 : undifined instruction
+	0x08 : software interupt (svr)
+	0x0c : pre abort
+	0x10 : data abort
+	0x14 : reserverd
+	0x18 : IRQ
+	0x1c : FIQ
+	The insruction table is used to put the correct branch instructions 
+	(ie, if there is an interupt, the intruction at 0x18 will be
+	[b <_interupt_handler_lable>])
+	into the correct memory location
+*/
+
+	/* Relocate Exception_Instructions table to start of mem */
+	ldr r3, =Exception_Instruction
+	mov r0, $0x0
+	ldr r2, [r3]
+	str r2,  [r0]				@ reset
+
+	ldr r2, [r3, $0x04]
+	str r2, [r0, $0x04]			@ undefined
+
+	ldr r2, [r3, $0x08]
+	str r2, [r0, $0x08]			@ svr
+
+	ldr r2, [r3, $0x0c]
+	str r2, [r0, $0x0c]			@ pre abort
+
+	ldr r2, [r3, $0x10]
+	str r2, [r0, $0x10]			@ data abort
+
+	ldr r2, [r3, $0x14]
+	str r2, [r0, $0x14]			@ resered
+
+	ldr r2, [r3, $0x18]
+	str r2, [r0, $0x18]			@ IRQ
+
+	ldr r2, [r3, $0x1c]
+	str r2, [r0, $0x1c]			@ FIQ
+
+	b _start
+Exception_Instruction:				@ instruction to be relocated
+	b _reset		@ 0x00 reset
+	b _undefined		@ 0x04 undefined instruction
+	b _swi			@ 0x08 software interupt
+	b _pre_abort		@ 0x0c
+	b _data_abort		@ 0x10
+	b _reserved		@ 0x14
+	b _irq_interupt		@ 0x18
+	b _fiq_interupt		@ 0x1c TODO run direct from this address
 
 	.global _start
-_start:
-	/* Exception Vector Table for arm*/
-	b _reset	@ 0x00 reset
-	b _undefined	@ 0x04 undefined instruction
-	b _swi		@ 0x08 softeare interupt or svr
-	b _pre_abort	@ 0x0c
-	b _data_abort	@ 0x10
-	b _reserved	@ 0x14
-	b _irq_interupt @ 0x18 IRQ's
-_fiq_interupt:
-	b _fiq_interupt @ 0x1c fast interupt code can run directly from here
-			@ without need to branch.
-	.global _reset
-_reset:
-	/* Enable branch prediction in System Control coprocessor (CP15) and
-	/*  enable instruction cache  
-	/* mcr p15, 0, <rd>, c1, c0, 0  ; Read Control Register configuration
-	/* mrc p15, 0, <rd>, c1, c0, 0  ; write Control Register configuration
-	/*  bits [11] - branch prediction, [12] - L1 intruction cache	*/
+_start: 
+	b _reset					@ reset sets up i and d
+							@  cache and other stuff
 
-	mrc p15, 0, r0, c1, c0, 0	@ read control reg of p15
-	mov r1, $0x1800			@ bits 11 and 12
-	orr r0, r0, r1
-	mcr p15, 0, r0, c1, c0, 0	@ write to control reg of c15
-	
-	mov r0, $0x00
-	mcr p15, 0, r0, c7, c5, 0	@ invalidate I cache and flush btac
-
-	/* Set up the stack pointers for different cpu modes */
-	
-	mov r0, $0x11			@ Enter FIQ mode
-	msr cpsr, r0			@ ensure irq and fiq are disabled
-	mrs r0, cpsr
-	orr r0, r0, $0xc0
-	msr cpsr, r0
-	mov sp, $0xf20000		@ set its stack pointer
-
-	mov r0, $0x12			@ Enter IRQ mode
-	msr cpsr, r0			@ ensure irq and fiq are disabled
-	mrs r0, cpsr
-	orr r0, r0, $0xc0
-	msr cpsr, r0
-	mov sp, $0xf10000		@ set its stack pointer
-	
-	
-	mov r0, $0x13			@ Enter SWI mode
-	msr cpsr, r0			@ ensure irq and fiq are disabled
-	mrs r0, cpsr
-	orr r0, r0, $0xc0
-	msr cpsr, r0
-	mov sp, $0xf30000		@ set its stack pointer
-
-	mov r0, $0x17			@ Enter ABORT mode
-	msr cpsr, r0			@ ensure irq and fiq are disabled
-	mrs r0, cpsr
-	orr r0, r0, $0xc0
-	msr cpsr, r0
-	mov sp, $0xf40000		@ set its stack pointer
-
-	mov r0, $0x1b			@ Enter UNDEFINED mode
-	msr cpsr, r0			@ ensure irq and fiq are disabled
-	mrs r0, cpsr
-	orr r0, r0, $0xc0
-	msr cpsr, r0
-	mov sp, $0xf50000		@ set its stack pointer
-
-	mov r0, $0x10
-	msr cpsr, r0			@ User mode | fiq/irq enabled
-	mov sp, $0xf00000
-	
-	/*	Enable various interupts	*/
-	mov r0, $0x20000000		@ Base address
-	add r0, r0, $0xb000
-	/* arm timer */
-	ldr r1, [r0, $0x218]		@ Only concerned with timer at this time
-	orr r1, r1, $0x1
-	str r1, [r0, $0x218]
-	ldr r2, =_arm_timer_interupt	@ loading loc of lable
-	ldr r3, =IrqHandler
-	str r2, [r3, $380]		@ timer handler has 95*4 offset
-	/*	End of enable interupts		*/
-	b _main
-
-/*=========================================================================*/
-	.section .text
 	.section .main
+	.global _main
 
 _main:
 	/* Turn on green led to inform user system is on */
@@ -96,7 +71,7 @@ _main:
 	mov r0, $16
 	mov r1, $0				@ turn off power turns on led
 	bl _set_gpio
-	
+
 _init_arm_timer:
 	mov r0, $0x6a000			@ tiny fraction under 1/2 sec
 	bl _set_arm_timer
@@ -108,12 +83,12 @@ _init_arm_timer:
 	mov r1, $720				@ 720
 	mov r2, $32
 	bl _init_framebuffer
-	teq r0, $0				@ zero returned = error
-	beq _error$	
+	teq r0, $0					@ zero returned = error
+	beq _error$
 
 	/* getting framebuffer address to print to screen and send */
 	bl _get_graphics_adr
-	
+
 	/* set backgroung colour to black in frame buffer*/
 _set_fb_colour:
 	mvn r0, $0xff000000
@@ -123,11 +98,11 @@ _set_fb_colour:
 
 	/* Display welcome text */
 	ldr r1, =Text1
-	ldr r2, =Text1lng	
+	ldr r2, =Text1lng
 	bl _display_tfb
-	
+
 	cmp r0, $0
-	blne _clrscr_dma0				
+	blne _clrscr_dma0
 	bl _display_tfb				@ Funtional _print_buffer
 
 	/* routine to move around the screen fabienne's pic*/

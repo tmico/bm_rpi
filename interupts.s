@@ -1,5 +1,76 @@
 /* Bellow are the handlers for each exception, obviously unfinshed!!!*/
 	.section .interupts
+
+	.global _reset
+_reset:
+	/* Enable branch prediction in System Control coprocessor (CP15) and
+	/*  enable instruction cache  
+	/* mcr p15, 0, <rd>, c1, c0, 0  ; Read Control Register configuration
+	/* mrc p15, 0, <rd>, c1, c0, 0  ; write Control Register configuration
+	/*  bits [11] - branch prediction, [12] - L1 intruction cache	*/
+
+	mrc p15, 0, r0, c1, c0, 0	@ read control reg of p15
+	mov r1, $0x1800			@ bits 11 and 12
+	orr r0, r0, r1
+	mcr p15, 0, r0, c1, c0, 0	@ write to control reg of c15
+
+	mov r0, $0x00
+	mcr p15, 0, r0, c7, c5, 0	@ invalidate I cache and flush btac
+
+	/* Set up the stack pointers for different cpu modes */
+
+	mov r0, $0x11			@ Enter FIQ mode
+	msr cpsr, r0			@ ensure irq and fiq are disabled
+	mrs r0, cpsr
+	orr r0, r0, $0xc0
+	msr cpsr, r0
+	mov sp, $0xf10000		@ set its stack pointer
+
+	mov r0, $0x12			@ Enter IRQ mode
+	msr cpsr, r0			@ ensure irq and fiq are disabled
+	mrs r0, cpsr
+	orr r0, r0, $0xc0
+	msr cpsr, r0
+	mov sp, $0xf20000		@ set its stack pointer
+
+	mov r0, $0x13			@ Enter SWI mode
+	msr cpsr, r0			@ ensure irq and fiq are disabled
+	mrs r0, cpsr
+	orr r0, r0, $0xc0
+	msr cpsr, r0
+	mov sp, $0xf30000		@ set its stack pointer
+
+	mov r0, $0x17			@ Enter ABORT mode
+	msr cpsr, r0			@ ensure irq and fiq are disabled
+	mrs r0, cpsr
+	orr r0, r0, $0xc0
+	msr cpsr, r0
+	mov sp, $0xf40000		@ set its stack pointer
+
+	mov r0, $0x1b			@ Enter UNDEFINED mode
+	msr cpsr, r0			@ ensure irq and fiq are disabled
+	mrs r0, cpsr
+	orr r0, r0, $0xc0
+	msr cpsr, r0
+	mov sp, $0xf50000		@ set its stack pointer
+
+	mov r0, $0x10
+	msr cpsr, r0			@ User mode | fiq/irq enabled
+	mov sp, $0xf00000
+
+	/*	Enable various interupts	*/
+	mov r0, $0x20000000		@ Base address
+	add r0, r0, $0xb000
+	/* arm timer */
+	ldr r1, [r0, $0x218]		@ Only concerned with timer at this time
+	orr r1, r1, $0x1
+	str r1, [r0, $0x218]
+	ldr r2, =_arm_timer_interupt	@ loading loc of lable
+	ldr r3, =IrqHandler
+	str r2, [r3, $380]		@ timer handler has 95*4 offset
+	/*	End of enable interupts		*/
+	b _main
+
 	.global _undefined
 _undefined:
 	b _undefined
@@ -97,6 +168,11 @@ _bit9:
 	bic r10, r10, $(31<<21)			@ clear duplicate interupts
 	bic r10, r10, $(1<<30)			@	also set in basic
 	bal _irq_bit
+
+	.global _fiq_interupt
+_fiq_interupt:
+	b _fiq_interupt
+
 
 /* IRQ handlers. 
 initial idea is routines wishing to use interupts need to place pointers
