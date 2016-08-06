@@ -18,20 +18,6 @@
 */
 
 	/* Relocate Exception_MemLoc table to start of mem */
-	.data
-	.align 2
-	Exception_MemLoc:		@ instruction to be relocated
-	b _reset		@ 0x00 reset
-	b _undefined		@ 0x04 undefined instruction
-	b _swi			@ 0x08 software interupt
-	b _pre_abort		@ 0x0c
-	b _data_abort		@ 0x10
-	b _reserved		@ 0x14
-	b _irq_interupt		@ 0x18
-	b _fiq_interupt		@ 0x1c TODO run direct from this address
-
-	.text
-	.align 2
 	ldr r3, =Exception_MemLoc
 	mov r0, $0x0
 	ldr r2, [r3]
@@ -60,6 +46,20 @@
 
 	b _start
 
+	.data
+	.align 2
+Exception_MemLoc:				@ instruction to be relocated
+	b _reset		@ 0x00 reset
+	b _undefined		@ 0x04 undefined instruction
+	b _swi			@ 0x08 software interupt
+	b _pre_abort		@ 0x0c
+	b _data_abort		@ 0x10
+	b _reserved		@ 0x14
+	b _irq_interupt		@ 0x18
+	b _fiq_interupt		@ 0x1c TODO run direct from this address
+
+	.text
+	.align 2
 
 	.global _start
 _start:
