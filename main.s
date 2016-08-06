@@ -18,7 +18,7 @@
 */
 
 	/* Relocate Exception_Instructions table to start of mem */
-	ldr r3, =Exception_Instruction
+	ldr r3, =Exception_MemLoc
 	mov r0, $0x0
 	ldr r2, [r3]
 	str r2,  [r0]				@ reset
@@ -45,7 +45,10 @@
 	str r2, [r0, $0x1c]			@ FIQ
 
 	b _start
-Exception_Instruction:				@ instruction to be relocated
+
+	.data
+	.align 2
+Exception_MemLoc:				@ instruction to be relocated
 	b _reset		@ 0x00 reset
 	b _undefined		@ 0x04 undefined instruction
 	b _swi			@ 0x08 software interupt
@@ -55,8 +58,11 @@ Exception_Instruction:				@ instruction to be relocated
 	b _irq_interupt		@ 0x18
 	b _fiq_interupt		@ 0x1c TODO run direct from this address
 
+	.text
+	.align 2
+
 	.global _start
-_start: 
+_start:
 	b _reset					@ reset sets up i and d
 							@  cache and other stuff
 
