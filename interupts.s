@@ -1,5 +1,60 @@
-/* Bellow are the handlers for each exception, obviously unfinshed!!!*/
 	.section .interupts
+/*
+	Instruction table to load into memory 0x00
+	The kernel is loaded to mem loc 0x8000. The arm system jumps to these
+	addresses when there is an exception:
+	0x00 : reset
+	0x04 : undifined instruction
+	0x08 : software interupt (svr)
+	0x0c : pre abort
+	0x10 : data abort
+	0x14 : reserverd
+	0x18 : IRQ
+	0x1c : FIQ
+	The insruction table is used to put the correct branch instructions 
+	(ie, if there is an interupt, the intruction at 0x18 will be
+	[b <_interupt_handler_lable>] or [ldr pc, =_irq_interupt])
+	into the correct memory location
+*/
+	.global _relocate_exception_vector
+
+	/* This is such a kludge!!!! */
+	/* Relocate Exception_MemLoc table to start of mem */
+
+_relocate_exception_vector:
+	ldr r3, =Exception_Vector
+	mov r0, $0x0
+	
+	ldm r3, {r4 - r11}
+	stm r0!, {r4 - r11}
+
+	ldr r3, =Exception_MemLoc
+	ldm r3, {r4 - r11}
+	stm r0, {r4 - r11}
+
+	bx lr
+Exception_Vector:			@ instruction to be relocated
+	ldr pc, [pc, $24]
+	ldr pc, [pc, $24]
+	ldr pc, [pc, $24]
+	ldr pc, [pc, $24]
+	ldr pc, [pc, $24]
+	ldr pc, [pc, $24]
+	ldr pc, [pc, $24]
+	ldr pc, [pc, $24]
+
+Exception_MemLoc:				
+	.word _reset			@ 0x00 reset
+	.word _undefined		@ 0x04 undefined instruction
+	.word _swi			@ 0x08 software interupt
+	.word _pre_abort		@ 0x0c
+	.word _data_abort		@ 0x10
+	.word _reserved			@ 0x14
+	.word _irq_interupt		@ 0x18
+	.word _fiq_interupt		@ 0x1c TODO run direct from this address
+
+
+/* Bellow are the handlers for each exception, obviously unfinshed!!!*/
 
 	.global _reset
 _reset:

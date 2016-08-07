@@ -1,66 +1,6 @@
 	.section .init				@ initialize this section first
-/*
-	Instruction table to load into memory 0x00
-	The kernel is loaded to mem loc 0x8000. The arm system jumps to these
-	addresses when there is an exception:
-	0x00 : reset
-	0x04 : undifined instruction
-	0x08 : software interupt (svr)
-	0x0c : pre abort
-	0x10 : data abort
-	0x14 : reserverd
-	0x18 : IRQ
-	0x1c : FIQ
-	The insruction table is used to put the correct branch instructions 
-	(ie, if there is an interupt, the intruction at 0x18 will be
-	[b <_interupt_handler_lable>])
-	into the correct memory location
-*/
-
-	/* Relocate Exception_MemLoc table to start of mem */
-	ldr r3, =Exception_MemLoc
-	mov r0, $0x0
-	ldr r2, [r3]
-	str r2,  [r0]				@ reset
-
-	ldr r2, [r3, $0x04]
-	str r2, [r0, $0x04]			@ undefined
-
-	ldr r2, [r3, $0x08]
-	str r2, [r0, $0x08]			@ svr
-
-	ldr r2, [r3, $0x0c]
-	str r2, [r0, $0x0c]			@ pre abort
-
-	ldr r2, [r3, $0x10]
-	str r2, [r0, $0x10]			@ data abort
-
-	ldr r2, [r3, $0x14]
-	str r2, [r0, $0x14]			@ resered
-
-	ldr r2, [r3, $0x18]
-	str r2, [r0, $0x18]			@ IRQ
-
-	ldr r2, [r3, $0x1c]
-	str r2, [r0, $0x1c]			@ FIQ
-
+	bl _relocate_exception_vector		@ set up exception vector table
 	b _start
-
-	.data
-	.align 2
-Exception_MemLoc:				@ instruction to be relocated
-	b _reset		@ 0x00 reset
-	b _undefined		@ 0x04 undefined instruction
-	b _swi			@ 0x08 software interupt
-	b _pre_abort		@ 0x0c
-	b _data_abort		@ 0x10
-	b _reserved		@ 0x14
-	b _irq_interupt		@ 0x18
-	b _fiq_interupt		@ 0x1c TODO run direct from this address
-
-	.text
-	.align 2
-
 	.global _start
 _start:
 	b _reset					@ reset sets up i and d
