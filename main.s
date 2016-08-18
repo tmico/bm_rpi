@@ -1,12 +1,36 @@
 	.section .init				@ initialize this section first
-	bl _relocate_exception_vector		@ set up exception vector table
-	b _start
-	.global _start
-_start:
-	b _reset					@ reset sets up i and d
-							@  cache and other stuff
+_reloc_exeption_image:
+	.word 0xe59ff018		@ = ldr pc, [pc, #24]
+	.word 0xe59ff018
+	.word 0xe59ff018
+	.word 0xe59ff018
+	.word 0xe59ff018
+	.word 0xe59ff018
+	.word 0xe59ff018
+	.word 0xe59ff018
+reset_h:
+	.word _reset
+undefined_h:
+	.word _undefined
+swi_h:
+	.word _swi
+pre_abort_h:
+	.word _pre_abort
+data_abort_h:
+	.word _data_abort
+reserved_h:
+	.word _reserved
+irq_h:
+	.word _irq_interupt
+fiq_h:
+	.word _fiq_interupt
 
 	.section .main
+
+	.global _start
+_start:
+	b _main
+
 	.global _main
 
 _main:
@@ -14,17 +38,22 @@ _main:
 	mov r0, $16				@ GPIO led pin 
 	mov r1, $1				@ set to output
 	bl _set_gpio_func 
+
 	mov r0, $16
 	mov r1, $0				@ turn off power turns on led
 	bl _set_gpio
 
 _init_arm_timer:
+	/* seting up timer (The interrupt handler makes green led blink */
+
 	mov r0, $0x6a000			@ tiny fraction under 1/2 sec
 	bl _set_arm_timer
 
+_setup_framebuffer:
 	/* To use defaults set in framebuffer.s set r0 to zero.
 	 * Otherwise r0 is virtual width, r1 virtual height and r2 is colour 
 	 * depth  */
+
 	mov r0, $1280				@ 1280
 	mov r1, $720				@ 720
 	mov r2, $32
@@ -40,16 +69,14 @@ _set_fb_colour:
 	mvn r0, $0xff000000
 	bl _fg_colour
 
-	/* seting up timer (The interrupt handler makes green led blink */
-
 	/* Display welcome text */
 	ldr r1, =Text1
 	ldr r2, =Text1lng
-	bl _display_tfb
+	bl _write_tfb
 
 	cmp r0, $0
 	blne _clrscr_dma0
-	bl _display_tfb				@ Funtional _print_buffer
+	bl _display_tfb
 
 	/* routine to move around the screen fabienne's pic*/
 _L0:
@@ -70,7 +97,7 @@ _L1:
 	
 
 
-	/* Attempt a dma transfer to clear screen */
+	/* dma transfer to clear screen */
 /*	
 	ldr r5, =SysTimer
 _1:

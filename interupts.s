@@ -1,4 +1,5 @@
 	.section .interupts
+	.align 2
 /*
 	Instruction table to load into memory 0x00
 	The kernel is loaded to mem loc 0x8000. The arm system jumps to these
@@ -16,61 +17,55 @@
 	[b <_interupt_handler_lable>] or [ldr pc, =_irq_interupt])
 	into the correct memory location
 */
-	.global _relocate_exception_vector
-
-	/* This is such a kludge!!!! */
-	/* Relocate Exception_MemLoc table to start of mem */
-
-_relocate_exception_vector:
-	ldr r3, =Exception_Vector
-	mov r0, $0x0
-	
-	ldm r3, {r4 - r11}
-	stm r0!, {r4 - r11}
-
-	ldr r3, =Exception_MemLoc
-	ldm r3, {r4 - r11}
-	stm r0, {r4 - r11}
-
-	bx lr
-Exception_Vector:			@ instruction to be relocated
-	ldr pc, [pc, $24]
-	ldr pc, [pc, $24]
-	ldr pc, [pc, $24]
-	ldr pc, [pc, $24]
-	ldr pc, [pc, $24]
-	ldr pc, [pc, $24]
-	ldr pc, [pc, $24]
-	ldr pc, [pc, $24]
-
-Exception_MemLoc:				
-	.word _reset			@ 0x00 reset
-	.word _undefined		@ 0x04 undefined instruction
-	.word _swi			@ 0x08 software interupt
-	.word _pre_abort		@ 0x0c
-	.word _data_abort		@ 0x10
-	.word _reserved			@ 0x14
-	.word _irq_interupt		@ 0x18
-	.word _fiq_interupt		@ 0x1c TODO run direct from this address
-
-
 /* Bellow are the handlers for each exception, obviously unfinshed!!!*/
+
 
 	.global _reset
 _reset:
+
+	/* Ensure we are in supervisor mode */
+	mov r0, $0x13
+	msr cpsr_c, r0
+
+	/* populate 0x00 to 0x1c with ldr pc instructions to jump to correct
+	   handler. pc is loaded the correct address found at pc + 5instruction
+	   mem block 0x20 to 0x38 holds these correct addresses
+	*/   
+	mov r1, $0x8000
+	mov r0, $0x0000
+	ldmia r1!, {r4 - r11}
+	stmia r0!, {r4 - r11}
+	ldmia r1!, {r4 - r11}
+	stmia r0!, {r4 - r11}
+
 	/* Enable branch prediction in System Control coprocessor (CP15) and
 	/*  enable instruction cache  
 	/* mcr p15, 0, <rd>, c1, c0, 0  ; Read Control Register configuration
 	/* mrc p15, 0, <rd>, c1, c0, 0  ; write Control Register configuration
-	/*  bits [11] - branch prediction, [12] - L1 intruction cache	*/
+	/*  bits [11] - branch prediction, [12] - L1 intruction cache
+	mcr p15, 0, r0, c7, c5, 6	@ flush branch target cache
+	mcr p15, 0, r0, c7, c5, 4	@ flush prefetch buffer
+	mcr p15, 0, r0, c7, c5, 0	@ invalidate I cache and flush btac
+	*/
 
 	mrc p15, 0, r0, c1, c0, 0	@ read control reg of p15
-	mov r1, $0x1800			@ bits 11 and 12
+	mov r1, $0x1800			@ bits 11 and 12 enable I and Z
 	orr r0, r0, r1
+	bic r0, r0, $0x1		@ Disable the mmu (M)
+	bic r0, r0, $0x2		@ Disable strict alignment (A)
+	bic r0, r0, $0x4		@ Disable unified/Data cache (C)
+	bic r0, r0, $0x80		@ Little endian system (B)
+	bic r0, r0, $0x100		@ Disable system protection (S)
+	bic r0, r0, $0x200		@ Disable rom protection (R)
+	bic r0, r0, $0x2000		@ clear = low exception vector (V)
 	mcr p15, 0, r0, c1, c0, 0	@ write to control reg of c15
 
+	/* Set VBAR to zero (reset value) */
+	mov r0, $0x0
+	mcr p15, 0, r0, c12, c0, 0
+
 	mov r0, $0x00
-	mcr p15, 0, r0, c7, c5, 0	@ invalidate I cache and flush btac
+	mcr p15, 0, r0, c7, c7, 0	@ invalidate both caches and flush btac
 
 	/* Set up the stack pointers for different cpu modes */
 
@@ -79,43 +74,51 @@ _reset:
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0xf10000		@ set its stack pointer
+	mov sp, $0x8000			@ set its stack pointer
 
 	mov r0, $0x12			@ Enter IRQ mode
 	msr cpsr, r0			@ ensure irq and fiq are disabled
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0xf20000		@ set its stack pointer
+	mov sp, $0x8000			@ set its stack pointer
 
 	mov r0, $0x13			@ Enter SWI mode
 	msr cpsr, r0			@ ensure irq and fiq are disabled
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0xf30000		@ set its stack pointer
+	mov sp, $0x8000			@ set its stack pointer
 
 	mov r0, $0x17			@ Enter ABORT mode
 	msr cpsr, r0			@ ensure irq and fiq are disabled
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0xf40000		@ set its stack pointer
+	mov sp, $0x8000			@ set its stack pointer
 
 	mov r0, $0x1b			@ Enter UNDEFINED mode
 	msr cpsr, r0			@ ensure irq and fiq are disabled
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0xf50000		@ set its stack pointer
+	mov sp, $0xf0000		@ set its stack pointer
 
 	mov r0, $0x10
 	msr cpsr, r0			@ User mode | fiq/irq enabled
-	mov sp, $0xf00000
+	mov sp, $0xF8000
 
 	/*	Enable various interupts	*/
-	mov r0, $0x20000000		@ Base address
+	/* Clear all enable interupts first	*/
+
+	mov r0, $0x20000000		@ Base irq address
 	add r0, r0, $0xb000
+	mvn r1, $0
+	str r1, [r0, $0x21c]
+	str r1, [r0, $0x220]
+	str r1, [r0, $0x224]
+	mov r1, $0
+	str r1, [r0, $0x20c]		@ disable all FIQ
 	/* arm timer */
 	ldr r1, [r0, $0x218]		@ Only concerned with timer at this time
 	orr r1, r1, $0x1
@@ -124,7 +127,7 @@ _reset:
 	ldr r3, =IrqHandler
 	str r2, [r3, $380]		@ timer handler has 95*4 offset
 	/*	End of enable interupts		*/
-	b _main
+	b _start
 
 	.global _undefined
 _undefined:
@@ -133,10 +136,6 @@ _undefined:
 	.global _swi
 _swi:
 	b _swi
-
-	.global _abort
-_abort:
-	b _abort
 
 	.global _pre_abort
 _pre_abort:
@@ -224,6 +223,7 @@ _bit9:
 	bic r10, r10, $(1<<30)			@	also set in basic
 	bal _irq_bit
 
+
 	.global _fiq_interupt
 _fiq_interupt:
 	b _fiq_interupt
@@ -240,11 +240,11 @@ TO DO !!!	*/
 	.global _arm_timer_interupt
 _arm_timer_interupt:	
 	/* First clear the pending interupt */
-	mov r2, $0x20000000			@ timer base address
+	mov r2, $0x20000000			@ timer base addr = 0x2000b40c
 	add r2, r2, $0xb000
 	mov r5, $1
 	str r5, [r2, $0x40c]
-	ldr r3, = IrqService
+	ldr r3, = LedOnOff
 	ldr r1, [r3]
 	mov r0, $16
 	mov r4, lr				@ preserv lr
@@ -254,11 +254,12 @@ _arm_timer_interupt:
 	bx r4
 .data
 .align 2
+
 	.global IrqHandler
 
 IrqHandler:			@ 96 irq handlers pointers
 	.rept 96
 	.word 0
 	.endr
-IrqService:
-	.word	0x1		@ Address of routine that set timer interupt
+LedOnOff:
+	.word	0x0
