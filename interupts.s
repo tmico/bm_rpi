@@ -135,7 +135,23 @@ _undefined:
 
 	.global _swi
 _swi:
-	b _swi
+
+	stmfd sp!, {r0-r12, lr}	 	@ unlike IRQ/FIQ lr is pc +4 needs checking
+	/* going to print to contents of all the registers inc spsr - 
+		for degbuging reasons
+	*/
+
+	stmfd sp!, {r0 - r12}			@ load stack with args to print
+	ldr r0, =RegContent
+	mrs r1, spsr
+	sub r2, lr, $4				@ when the excepton happend
+	ldr r3, =SwiLable
+	bl _kprint
+	bl _write_tfb
+	cmp r0, $0				@ clear screen?
+	blne _clrscr_dma0
+	bl _display_tfb
+	ldmfd sp!, {r0-r12, pc}^		@ return from svr/swi
 
 	.global _pre_abort
 _pre_abort:
@@ -263,3 +279,9 @@ IrqHandler:			@ 96 irq handlers pointers
 	.endr
 LedOnOff:
 	.word	0x0
+RegContent:
+	.asciz "\ncpsr: %d\npc_old: %d\nException: %s\nr12: %d\nr11: %d\n \
+r10: %d\nr9: %d\nr8: %d\nr7: %d\nr6: %d\nr5: %d\nr4: %d\nr3: %d\nr2: %d\n \
+r1: %d\nr0: %d"
+SwiLable:
+	.asciz "SRV/SWI"
