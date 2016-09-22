@@ -11,6 +11,11 @@
 FabPic:						@ picture by fabienne micoud
 	.incbin		"fabs.bmp"
 
+
+	.global VirusAscii
+VirusAscii:
+	.incbin 	"ascii-virus.txt"
+
 /* psf2 font format : - 
  *	1. The header
  *	2. The font

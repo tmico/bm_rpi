@@ -49,6 +49,21 @@ _init_arm_timer:
 	mov r0, $0x6a000			@ tiny fraction under 1/2 sec
 	bl _set_arm_timer
 
+	/* setup uart and send welcome text */
+_uart_print:
+	ldr r0, =VirusAscii
+	bl _uart_t
+	cmn r0, $1
+	beq _error$
+
+	ldr r0, =Text1
+	bl _uart_t
+	cmn r0, $1
+	beq _error$
+
+	bl _rxtx_char
+
+
 _setup_framebuffer:
 	/* To use defaults set in framebuffer.s set r0 to zero.
 	 * Otherwise r0 is virtual width, r1 virtual height and r2 is colour 
@@ -116,7 +131,7 @@ _Bloop:
 
 	.global _error$
 _error$:
-	mov r0, $0x3a000			
+	mov r0, $0x2a000			
 	bl _set_arm_timer
 
 	b _Bloop
@@ -127,8 +142,3 @@ _error$:
 SysTimer:
 	.int 0x00
 
-Stack2:
-	.word 0x00
-	.word 0x20
-	.word 0xff
-	.word 0xff
