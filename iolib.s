@@ -5,7 +5,12 @@
 
 
 _kprint:
-/* _kprint funtion - converts values for printing according to args given
+/*i	Input:	r0 string address
+		r1 - r3 interger, character (ascii), address of string (pointer)
+		stack additional args (int, char, string address)
+	Output: r0 0 success; -1 failure
+		r1 StdOut
+	_kprint funtion - converts values for printing according to args given
 	and converts to ascii and stores in StdOut (Max size of StdOut is 1024 char)
 	_kprint is a variadic function.
 	place holder	Meaning
