@@ -61,7 +61,7 @@ _uart_print:
 	cmn r0, $1
 	beq _error$
 
-	bl _rxtx_char
+@	bl _rxtx_char
 
 
 _setup_framebuffer:
@@ -76,8 +76,17 @@ _setup_framebuffer:
 	teq r0, $0					@ zero returned = error
 	beq _error$
 
-	/* getting framebuffer address to print to screen and send */
+	/* getting framebuffer address to send via uart */
 	bl _get_graphics_adr
+	ldr r3, =GraphicsAdr
+	ldr r1, [r3, $32]			@ ldr the GPU adr
+	ldr r0, =hfs				@ ldr hex format specifier
+	bl _kprint				@ kprint will put it in StOut
+
+	cmp r0, $0
+	mov r0, r1
+	bleq _uart_t
+	bl _rxtx_char
 
 	/* set backgroung colour to black in frame buffer*/
 _set_fb_colour:
@@ -135,6 +144,8 @@ _error$:
 	bl _set_arm_timer
 
 	b _Bloop
+hfs:
+	.asciz "%x\n"
 
 	.data
 	.align 2

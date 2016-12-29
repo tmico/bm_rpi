@@ -84,7 +84,7 @@ _uart_init:
 	str r3, [r1, $0x44]
 	str r3, [r1, $0x38]
 
-	
+
 	/* flush fifo, reenable tx and rx */
 	mov r2, $0
 	str r2, [r1, $0x2c]			@ flush fifo
@@ -93,7 +93,7 @@ _ut2:
 	ldr r2, [r1, $0x18]			@ get status from flag reg
 	tst r2, $(1<<3)				@  and tst 'busy' bit
 	bne _ut2				@ wait till not busy
-	
+
 	mov r2, $((1<<4)|(1<<5)|(1<<6))		@ enable fifo, 8 bit tx
 	str r2, [r1, $0x2c]
 
@@ -105,7 +105,7 @@ _ut2:
 	ldr r3, =UartInit
 	mov r2, $1
 	str r2, [r3]
-	
+
 	bx r12					@ return 
 
 
@@ -176,7 +176,7 @@ _u_puts:
 	ldr r3, =UartLck
 	mov r0, $0
 	swp r0, r0, [r3]			@ unlock mutex
-	
+
 	ldmfd sp!, {pc}				@ return
 
 Uart0_Base:
@@ -230,23 +230,23 @@ _u_gets:
 	ldrb r2, [r3]
 	strb r2, [r12], $1
 	bic r12, $0x2000
-	cmp r2, $0xa	
+	cmp r2, $0xa
 	bne _u_gets
 
 	mov r0, $0
 	strb r0, [r12]
 	ldr r3, =UartLck
 	swp r0, r0, [r3]			@ unlock mutex
-	
+
 	mov r0, $0xf9000
 	ldmfd sp!, {pc}				@ return
 
 	/* recieve a char from remote connection, echo it back, str in 
 	   input buffer starting at 0xf9000
-	*/   
+	*/  
 _rxtx_char:
 	ldr r3, Uart0_Base
-	mov r12, $0xf9000
+	ldr r12, =StdIn
 	mov r1, $0xa
 _gc1:
 	ldr r2, [r3, $0x18]
@@ -257,7 +257,7 @@ _gc2:
 	ldr r2, [r3, $0x18]
 	tst r2, $(1<<3)
 	bne _gc2				@ ensure not busy
-	
+
 _gc3:
 	ldr r2, [r3, $0x18]
 	tst r2, $(1<<4)				@ is rx fifo not empty
@@ -265,16 +265,16 @@ _gc3:
 
 	ldrb r0, [r3]
 	strb r0, [r12], $1			@ save it on input buffer
-	bic r12, r12, $0x2000			@ looping buffer
+	bic r12, r12, $0x400			@ looping buffer
 	strb r0, [r3]				@ echo
 	cmp r0, $'\r'				@ insert \n after \r
 	streqb r1, [r12], $1
-	bic r12, r12, $0x2000			@ looping buffer
+	bic r12, r12, $0x400			@ looping buffer
 	streqb r1, [r3]
 
 	b _gc1					@ temp endless loop
-	
-	
+
+
 	.data
 	.align 2
 

@@ -39,7 +39,7 @@ _write_tfb:
 	add tba, tba, tb
 	rsb nx, x, $79				@ n.o spaces left
 _WT0:	
-	cmp char, $0x20
+	cmp   char, $0x20
 	strb char, [tba], $1
 	bmi _non_write
 	subs noc, noc, $1			@ string counter
@@ -301,6 +301,13 @@ ScreenBuffer:					@ gadr to use by dma_0 to clear
 	.align 10
 	.global StdOut
 StdOut:
+	.rept 0x400				@ 1024 bytes reserved
+	.byte 0x0
+	.endr
+
+	.align 10
+	.global StdIn
+StdIn:
 	.rept 0x400				@ 1024 bytes reserved
 	.byte 0x0
 	.endr

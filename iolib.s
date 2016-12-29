@@ -3,13 +3,13 @@
 	.align 2
 	.global _kprint
 
-
 _kprint:
-/*i	Input:	r0 string address
+/*	Input:	r0 string address
 		r1 - r3 interger, character (ascii), address of string (pointer)
 		stack additional args (int, char, string address)
 	Output: r0 0 success; -1 failure
 		r1 StdOut
+
 	_kprint funtion - converts values for printing according to args given
 	and converts to ascii and stores in StdOut (Max size of StdOut is 1024 char)
 	_kprint is a variadic function.
@@ -24,6 +24,7 @@ _kprint:
 		%l	long (64 bit)
 
 */
+_kprint:	
 	stmfd sp!, {r3}				@ str args for easy access
 	stmfd sp!, {r2}				@ str args for easy access
 	stmfd sp!, {r1}				@ str args for easy access
@@ -37,7 +38,7 @@ _kprint:
 _parse:
 	teq r4, $'%'				@ '%' a la printf()
 	beq _forsp				@ FORmatSPecifier
-	teq r4, $0				@ NULL terminator
+	teq r4, $0					@ NULL terminator
 	strneb r4, [r5], $1			@ strb to StdOut
 	subnes r7, r7, $1
 	ldrneb r4, [r6], $1
@@ -375,6 +376,15 @@ _DL1:
 	.unreq hhi
 	.unreq scratch
 
+        /* Format specifiers -- to be moved */
+_h5x:
+        .ascii "%x"
+_h5d:
+	.ascii "%d"
+_h5c:
+	.ascii "%c"
+_h5s:
+	.ascii "%s"
 
 	.DATA
 	.align 2
