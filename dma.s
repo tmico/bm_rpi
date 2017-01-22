@@ -90,7 +90,7 @@
 _clrscr_dma0:
 	/* DEST_AD */
 	ldr r0, =ConBlk_0
-	ldr r2, =GraphicsAdr
+	ldr r2, =framebuffer_info
 	ldr r3, [r2, #32]			@ r3 = GPU pointer
 
 	str r3, [r0, #8]			@ put it in CB DEST_AD

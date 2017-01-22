@@ -40,19 +40,9 @@
 FgColour:
 	.word 0xffffffff
 
-	.align 4
 	.global GraphicsAdr
-GraphicsAdr:		@ copy of framebuffer_info incase we don't want stdout
-.int 640		@ #0 Physical Width (for my monitor)
-.int 360		@ #4 Physical Hieght
-.int 640		@ #8 eg Virtual Width
-.int 360		@ #12 eg Virtual Hieght
-.int 0			@ #16 GPU Pitch, GPU will fill it. no bytes per row
-.int 24			@ #20 bit depth
-.int 0			@ #24 X offsets (pixils to skip in top left corner)
-.int 0			@ #28 Y
-.int 0			@ #32 GPU Pointer
-.int 0			@ #36 GPU Size
+GraphicsAdr:
+	.word
 
 	.section .text
 
@@ -62,19 +52,17 @@ _fg_colour:
 	str r0, [r1]				@ skip tesing as unnecessary
 	bx lr
 
-	.global _get_graphics_adr
-_get_graphics_adr:
-	stmfd sp!, {r4-r11}			@ push
+	.global _graphics_adr
+_graphics_adr:
+	/* In: r0 GPU pointer from framebuffer_info */
 	ldr r1, =GraphicsAdr
-	ldmia r0, {r2-r11}			@ mov GPU FB address to here
-	stmia r1, {r2-r11}
-	ldmfd sp!, {r4-r11}
+	str r0, [r1]
 	bx lr
 
 	.global _set_pixel24
 _set_pixel24:
 	stmfd sp!, {r4-r5, lr}			@ push
-	ldr r2, =GraphicsAdr			@ check that x and y are valid
+	ldr r2, =framebuffer_info		@ check that x and y are valid
 	ldrd r4, r5, [r2, #8]			@ virt values of width, hieght
 	cmp r0, r4				@  to cmp against
 	cmpls r1, r5
@@ -96,7 +84,7 @@ _set_pixel24:
 
 	.global _set_pixel32
 _set_pixel32:
-	ldr r12, =GraphicsAdr			@ check that x and y are valid
+	ldr r12, =framebuffer_info		@ check that x and y are valid
 	ldrd r2, r3, [r12, #8]			@ virt values of width, hieght
 	cmp r0, r2				@  to cmp against
 	cmpls r1, r3
@@ -114,7 +102,7 @@ _set_pixel32:
 
 	.global _set_pixel16
 _set_pixel16:
-	ldr r3, =GraphicsAdr			@ original code that only 
+	ldr r3, =framebuffer_info		@ original code that only 
 	ldr r12, [r3]				@ would work for 16bit
 	ldrd r2, r3, [r12, #8]			@ adr of virtual width, hieght
 	cmp r0, r2

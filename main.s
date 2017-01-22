@@ -73,13 +73,13 @@ _setup_framebuffer:
 	mov r1, $720				@ 720
 	mov r2, $32
 	bl _init_framebuffer
-	teq r0, $0					@ zero returned = error
+	teq r0, $0				@ zero returned = error
 	beq _error$
 
 	/* getting framebuffer address to send via uart */
-	bl _get_graphics_adr
-	ldr r3, =GraphicsAdr
-	ldr r1, [r3, $32]			@ ldr the GPU adr
+	bl _graphics_adr
+	ldr r3, =GraphicsAdr			@ str GPU addr in r0
+	ldr r1, [r3]				@ ldr the GPU adr
 	ldr r0, =hfs				@ ldr hex format specifier
 	bl _kprint				@ kprint will put it in StOut
 
