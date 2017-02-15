@@ -213,7 +213,10 @@ _str_end:
 	ldrle r2, =BOLength
 	ldrgt r1, =StdOut
 	ldrle r1, =BufferOverflow
-	ldmfd sp!, {r4 - r10, pc}	@ return
+/*EXIT*/
+	ldmfd sp!, {r4 - r10, lr}		@ return
+	add sp, sp, $0xc			@ adjust sp back 12bytes
+	bx lr
 
 	
 _bin_asciihex:

@@ -86,7 +86,7 @@ _setup_framebuffer:
 	cmp r0, $0
 	mov r0, r1
 	bleq _uart_t
-	bl _rxtx_char
+	@bl _rxtx_char
 
 	/* set backgroung colour to black in frame buffer*/
 _set_fb_colour:
@@ -135,6 +135,18 @@ _1:
 	
 	b _L1
 	*/
+/*****************************************************************************/
+/************** Testing *** Code *****************/
+@testing transfer speeds between dma & cpu
+	bl _test_speeds
+@	nop
+@ testing soft system reboot
+	ldr r0, =RebootMsg
+	bl _kprint
+	mov r0, r1
+	bl _uart_t
+	b _reboot_system
+
 _Bloop:						
 	b _Bloop	@ Catch all loop
 
@@ -145,11 +157,12 @@ _error$:
 
 	b _Bloop
 hfs:
-	.asciz "%x\n"
+	.asciz "Graphics address: %x\n"
 
 	.data
 	.align 2
 	.global SysTimer
 SysTimer:
 	.int 0x00
-
+RebootMsg:
+	.asciz "The Pi Zero is rebooting"

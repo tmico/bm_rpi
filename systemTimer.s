@@ -111,3 +111,18 @@ _set_arm_timer:
 	mov r2, $0xa2				@ bits to set n control reg
 	str r2, [r3, $0x408]			@ control reg set
 	bx lr
+
+
+/* _sys_clock:
+	Input: no input. 64bit (CLO and CHI) free running counter starts at poweron
+	Output: R0, value of clo (lo 32bits)
+		R1, value of chi (hi 32bits)
+*/
+	.global _sys_clock
+_sys_clock:
+	mov r2, $0x20000000
+	add r2, r2, $0x3000			@ Base addr if timer is 0x20003000
+	ldr r0, [r2, $4]			@ get counter LO
+	ldr r1, [r2, $8]			@ get counter HI
+	bx lr
+

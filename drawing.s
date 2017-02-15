@@ -55,7 +55,9 @@ _fg_colour:
 	.global _graphics_adr
 _graphics_adr:
 	/* In: r0 GPU pointer from framebuffer_info */
+	ldr r3, =framebuffer_info
 	ldr r1, =GraphicsAdr
+	ldr r0, [r3, $32]
 	str r0, [r1]
 	bx lr
 
