@@ -30,12 +30,12 @@
     UART0_ITOP   = (UART0_BASE + 0x88),
     UART0_TDR    = (UART0_BASE + 0x8C),
 */
-	.global _uart_t
+	.global _uart_ctr
 	.global _uart_r
 	.global _rxtx_char
 
 _uart_init:
-	/* Entry point to this function is from uart_t. _uart_init is a once only
+	/* Entry point to this function is from uart_ctr. _uart_init is a once only
 	   function to prepare (or reset) pins as i don't know what state u-boot
 	   leaves them after exiting
 	*/
@@ -102,7 +102,7 @@ _ut2:
 	str r2, [r1, $0x30]
 
 	/* store uart0 ready */
-	ldr r3, =UartInit
+	ldr r3, =UartInfo
 	mov r2, $1
 	str r2, [r3]
 
@@ -121,63 +121,123 @@ _D1:
 	bne _D1
 	bx lr
 
-_uart_t:
+_uart_ctr:
+	/*Input R0: address of string to send 
+	  Return R0: 0 = success, 1 = blocked wait, 
 	/* To enable transmision, disable uart, wait for end of transmision,
 	   flush fifo by seting fen bit to 0 in uart_lcrh, reprogram uart_cr,
 	   enable uart.
 	   swp instruction used to implement a mutex with UartLck 
 	*/
+	/* TODO add checks not reciving data before sending, disable receive bit while sending */
 
 	ldr r3, =UartLck
 	mov r2, $1				@ 1 = in use, 0 free mutex
 	swp r2, r2, [r3]			@ semaphore: atomic ldr and str
 	cmp r2, $0				@ can we carry on?
-	mvnne r0, $0				@ if not return -1
+	movne r0, $1				@ if not return 1 for blocked
 	bxne lr
 
 	stmfd sp!, {lr}
-	ldr r3, =UartInit
+	ldr r3, =UartInfo
 	ldr r1, [r3]
 	cmp r1, $1				@ do we need to init uart?
 	blne _uart_init
 
-_uart_tbuffer:
-	/* count n.o bytes in str, appened \r char to str after \n char and
-	   put on a heap - output starts at 0xf8000, input starts at 0xf9000*/
+	/* Check that buffer is empty, if not can we allow buffer
+	   to be emptied onto uart's fifo? */
+_ctr:
+	ldr r3, =UartInfo			@ is buffer empty?
+	ldr r1, [r3, $8]
+	cmp r1, $0
+	streq r0, [r3, $12]			@ Save address of string
+
+	bleq _uart_put_buffer
+	bl _chk_txfifo
+	cmp r0, $0				@ check if blocked (1)
+	bleq _uart_puts
+	bl _uart_puts
+
+	/* block bellow to be deleted later */
+	cmp r0, $1
+	ldreq lr, _ctr
+	beq _delay
+
+
+	ldr r3, =UartLck			@ unlock
+	mov r2, $0
+	swp r2, r2, [r3]
+	ldmfd sp!, {pc}
+
+	/*Tranfer from address in r0 into UartTxBuffer. Number of char (bytes)
+	  is put into r12 */
+_uart_put_buffer:
+	ldr r3, =UartInfo			@ is buffer empty?
+	ldr r0, [r3, $12]
 	ldrb r1, [r0], $1
-	mov r2, $'\r'
-	mov r12, $0xf8000			@ assending heap
-
-_size_t:
+	ldr r3, =UartTxBuffer			@ ldr 128byte buffer
+	mov r12, $128				@ Max size
+	mov r2, $'\r'				@ insert after a '\n'
+_tb:
 	cmp r1, $'\n'
-	streqb r2, [r12], $1
-	bic r12, r12, $0x1000			@ ensure a looping buffer
-	strb r1, [r12], $1
-	bic r12, r12, $0x1000			@ ensure a looping buffer
-	teq r1, $0
+
+	streqb r2, [r3], $1
+	subeq r12, r12, $1
+
+	strb r1, [r3], $1
+	subs r12, r12, $1
+	cmpne r1, $0				@ Continue till Null char or full
 	ldrneb r1, [r0], $1
-	bne _size_t
+	bne _tb
 
-	sbc r0, r12, $0xf8000			@ r0 holds n.o char
-	mov r12, $0xf8000
+	ldr r2, =UartInfo
+	rsb r12, r12, $128			@ r12 now holds no chars
+	str r12, [r2, $8]
+	str r0, [r2, $12]			@ save current location
+	bx lr
+	
 
-	/* and at last transmit */
-	ldr r3, Uart0_Base
-_u_puts:
-	ldr r1, [r3, $0x18]			@ tst state of fifo
-	tst r1, $(1<<5)
+	/* Check if fifo is not full */
+_chk_txfifo:
+	ldr r2, Uart0_Base
+	ldr r1, [r2, $0x18]
+	tst r1, $(1<<5)				@ tst if fifo is full
+	movne r0, $1				@ 1 if blocked
+	moveq r0, $0				@ 0 if can continue
+	bx lr
+	
 
-	ldreqb r2, [r12], $1			@ put byte on fifo if room
-	streqb r2, [r3]
-	subeqs r0, r0, $1
+	/*Transmit whats in buffer, r0,r1 preserved*/
+_uart_puts:
+	stmfd sp!, {r4,r5,lr}			@ need more registers
+	bne _uart_puts
+	ldr r5, =UartInfo
+	ldr r3, =UartTxBuffer
+	ldr r2, Uart0_Base
+	ldr r12, [r5, $8]			@ get number of char in buffer
+	ldr r4, [r5, $4]			@ get offset to uartbuffer
+	ldrb r1, [r3, r4]
+_pc:
+	add r4, r4, $1
+	strb r1, [r2]				@ put char onto fifo
+	subs r12, r12, $1
+	beq _buffer_empty
+	bl _chk_txfifo
+	cmp r0, $0				@ can we continue?
+	ldreqb r1, [r3, r4]
+	beq _pc
 
-	bpl _u_puts
+	str r12, [r5, $8]			@ save chars left for later
+	str r4, [r5, $4]			@ save offset
+	ldmfd sp!, {r4, r5, pc}
 
-	ldr r3, =UartLck
-	mov r0, $0
-	swp r0, r0, [r3]			@ unlock mutex
-
-	ldmfd sp!, {pc}				@ return
+_buffer_empty:
+	mov r4, $0
+	str r4, [r5, $4]
+	str r4, [r5, $8]
+	
+	ldmfd sp!, {r4, r5, pc}
+	
 
 Uart0_Base:
 	.word 0x20201000
@@ -199,7 +259,7 @@ _uart_r:
 	bxne lr					@ exit if can't continue
 
 	stmfd sp!, {lr}
-	ldr r3, =UartInit
+	ldr r3, =UartInfo
 	ldr r2, [r3]
 	cmp r2, $1				@ has uart been configured?
 	blne _uart_init
@@ -278,9 +338,16 @@ _gc3:
 	.data
 	.align 2
 
-UartInit:
-	.word 0
+UartInfo:
+	.word 0		@ #0 UartInit
+	.word 0		@ #4 BufferOffset,
+	.word 0		@ #8 BufferFill, no of chars in buffer
+	.word 0		@ #12 string address
 
 UartLck:
 	.word 0
 
+UartTxBuffer:
+	.rept 0x80				@ 128 byte buffer
+	.byte 0
+	.endr
