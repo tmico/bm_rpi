@@ -138,42 +138,41 @@ _uart_ctr:
 	movne r0, $1				@ if not return 1 for blocked
 	bxne lr
 
-	stmfd sp!, {lr}
-	ldr r3, =UartInfo
-	ldr r1, [r3]
+	stmfd sp!, {r4, r5, lr}
+	ldr r5, =UartInfo
+	ldr r1, [r5]
 	cmp r1, $1				@ do we need to init uart?
 	blne _uart_init
 
 	/* Check that buffer is empty, if not can we allow buffer
 	   to be emptied onto uart's fifo? */
-_ctr:
-	ldr r3, =UartInfo			@ is buffer empty?
-	ldr r1, [r3, $8]
+	ldr r1, [r5, $12]			@ Is there existing string address
 	cmp r1, $0
-	streq r0, [r3, $12]			@ Save address of string
+	streq r0, [r5, $12]			@ Save address of string
 
+_ctr:
+	ldr r1, [r5, $8]			@ Is Buffer empty
+	cmp r1, $0
 	bleq _uart_put_buffer
-	bl _chk_txfifo
-	cmp r0, $0				@ check if blocked (1)
-	bleq _uart_puts
+
 	bl _uart_puts
+	cmp r0, $1				@ has it completed?
+	subeq pc, pc, $16
 
-	/* block bellow to be deleted later */
-	cmp r0, $1
-	ldreq lr, _ctr
-	beq _delay
-
+	/* If There is more to print return non zero */
+	ldr r0, [r5, $12]			@ String fully --> buffer?
+	cmp r0, $0				@@ next two lines can be supplanted with a process manager
+	bne _ctr
 
 	ldr r3, =UartLck			@ unlock
 	mov r2, $0
 	swp r2, r2, [r3]
-	ldmfd sp!, {pc}
+	ldmfd sp!, {r4, r5, pc}
 
 	/*Tranfer from address in r0 into UartTxBuffer. Number of char (bytes)
 	  is put into r12 */
 _uart_put_buffer:
-	ldr r3, =UartInfo			@ is buffer empty?
-	ldr r0, [r3, $12]
+	ldr r0, [r5, $12]
 	ldrb r1, [r0], $1
 	ldr r3, =UartTxBuffer			@ ldr 128byte buffer
 	mov r12, $128				@ Max size
@@ -190,10 +189,11 @@ _tb:
 	ldrneb r1, [r0], $1
 	bne _tb
 
-	ldr r2, =UartInfo
+	cmp r1, $0
 	rsb r12, r12, $128			@ r12 now holds no chars
-	str r12, [r2, $8]
-	str r0, [r2, $12]			@ save current location
+	str r12, [r5, $8]
+	strne r0, [r5, $12]			@ save current location
+	streq r1, [r5, $12]			@ Or indicate copy finnished
 	bx lr
 	
 
@@ -209,9 +209,11 @@ _chk_txfifo:
 
 	/*Transmit whats in buffer, r0,r1 preserved*/
 _uart_puts:
-	stmfd sp!, {r4,r5,lr}			@ need more registers
-	bne _uart_puts
-	ldr r5, =UartInfo
+	stmfd sp!, {lr}
+	bl _chk_txfifo				@ check there is room
+	cmp r0, $0				@ 0 continue, 1 stop full
+	ldmnefd sp!, {pc}
+
 	ldr r3, =UartTxBuffer
 	ldr r2, Uart0_Base
 	ldr r12, [r5, $8]			@ get number of char in buffer
@@ -229,14 +231,14 @@ _pc:
 
 	str r12, [r5, $8]			@ save chars left for later
 	str r4, [r5, $4]			@ save offset
-	ldmfd sp!, {r4, r5, pc}
+	ldmfd sp!, {pc}
 
 _buffer_empty:
 	mov r4, $0
 	str r4, [r5, $4]
 	str r4, [r5, $8]
 	
-	ldmfd sp!, {r4, r5, pc}
+	ldmfd sp!, {pc}
 	
 
 Uart0_Base:

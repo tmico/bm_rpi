@@ -57,8 +57,8 @@ _uart_print:
 	ldr r0, =VirusAscii
 	bl _uart_ctr
 
-@	bl _rxtx_char
 
+@	b _Bloop	
 
 _setup_framebuffer:
 	/* To use defaults set in framebuffer.s set r0 to zero.
@@ -83,7 +83,6 @@ _setup_framebuffer:
 	mov r0, r1
 	bleq _uart_ctr
 	cmp r0, $1
-	bleq _delay
 	@bl _rxtx_char
 
 	/* set backgroung colour to black in frame buffer*/
@@ -117,7 +116,26 @@ _L1:
 
 	bl _display_pic
 	
+/*****************************************************************************/
+/************** Testing *** Code *****************/
+@testing transfer speeds between dma & cpu
+	@bl _test_speeds
+@	nop
+@ testing soft system reboot
+	ldr r0, =RebootMsg
+	bl _kprint
+	mov r0, r1
+	bl _uart_ctr
+	b _reboot_system
 
+@ Delay routine
+_delay:
+	mov r0, $0x4000
+_d1:
+	subs r0, r0, $1
+	bne _d1
+	sub lr, lr, $12  @ dirty hack to test stuff
+	bx lr
 
 	/* dma transfer to clear screen */
 /*	
@@ -132,30 +150,7 @@ _1:
 
 	
 	b _L1
-	*/
-/*****************************************************************************/
-/************** Testing *** Code *****************/
-@testing transfer speeds between dma & cpu
-	@bl _test_speeds
-@	nop
-@ testing soft system reboot
-	ldr r0, =RebootMsg
-	bl _kprint
-	mov r0, r1
-	bl _uart_ctr
-	cmp r0, $1
-	bleq _delay
-	b _reboot_system
-
-@ Delay routine
-_delay:
-	mov r0, $0x4000
-_d1:
-	subs r0, r0, $1
-	bne _d1
-	sub lr, lr, $12  @ dirty hack to test new uart_ctr
-	bx lr
-
+*/
 _Bloop:						
 	b _Bloop	@ Catch all loop
 

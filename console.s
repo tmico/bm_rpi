@@ -258,7 +258,7 @@ Uvga16:
 
 	.global Text1
 Text1:
-	.asciz "< Welcome to VIRUS O1 >\n--- Writen in assembler ---\n--- Which is well cool!!! ---\n"
+	.asciz "\n< Welcome to VIRUS O1 >\n--- Writen in assembler ---\n--- Which is well cool!!! ---\n"
 
 	.global Text1lng 
 	Text1lng = . - Text1

@@ -16,7 +16,7 @@
 _reboot_system:
 	ldr r0, =PM_BASE
 	mov r2, $PM_PASSWORD
-	orr r1, r2, $0xf
+	orr r1, r2, $0x800
 	ldr r3, [r0, $PM_RSTC_OFFSET]
 	str r1, [r0, $PM_WDOG_OFFSET]
 	orr r1, r2, $0x20
