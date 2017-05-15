@@ -1,5 +1,8 @@
 *.[o]
 *.~
 *.patch
+kernel.*
+zimage
+uimage
 build/
 
