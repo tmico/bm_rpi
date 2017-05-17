@@ -27,7 +27,8 @@ _reset:
 	mov r0, $0x13
 	msr cpsr_c, r0
 
-	/* populate 0x00 to 0x1c with ldr pc instructions to jump to correct
+	/* Create a vector table to deal with exeptions. 
+	   populate 0x00 to 0x1c with ldr pc instructions to jump to correct
 	   handler. pc is loaded the correct address found at pc + 5instruction
 	   mem block 0x20 to 0x38 holds these correct addresses
 	*/   
@@ -67,8 +68,12 @@ _reset:
 	mov r0, $0x00
 	mcr p15, 0, r0, c7, c7, 0	@ invalidate both caches and flush btac
 
-	/* Set up the stack pointers for different cpu modes */
+	/* set up a temperory stack pointer and inititalize peripheral hardware
+	 * such as uart, gpu framebuffer, timer etc */
+	mov sp, $0x8000
+	bl _boot_seq
 
+	/* Set up the stack pointers for different cpu modes */
 	mov r0, $0x11			@ Enter FIQ mode
 	msr cpsr, r0			@ ensure irq and fiq are disabled
 	mrs r0, cpsr
@@ -88,7 +93,7 @@ _reset:
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0x8000			@ set its stack pointer
+	mov sp, $0x7000			@ set its stack pointer
 
 	mov r0, $0x17			@ Enter ABORT mode
 	msr cpsr, r0			@ ensure irq and fiq are disabled
@@ -108,25 +113,6 @@ _reset:
 	msr cpsr, r0			@ User mode | fiq/irq enabled
 	mov sp, $0xF8000
 
-	/*	Enable various interupts	*/
-	/* Clear all enable interupts first	*/
-
-	mov r0, $0x20000000		@ Base irq address
-	add r0, r0, $0xb000
-	mvn r1, $0
-	str r1, [r0, $0x21c]
-	str r1, [r0, $0x220]
-	str r1, [r0, $0x224]
-	mov r1, $0
-	str r1, [r0, $0x20c]		@ disable all FIQ
-	/* arm timer */
-	ldr r1, [r0, $0x218]		@ Only concerned with timer at this time
-	orr r1, r1, $0x1
-	str r1, [r0, $0x218]
-	ldr r2, =_arm_timer_interupt	@ loading loc of lable
-	ldr r3, =IrqHandler
-	str r2, [r3, $380]		@ timer handler has 95*4 offset
-	/*	End of enable interupts		*/
 	b _start
 
 	.global _undefined
@@ -197,10 +183,10 @@ _irq_interupt:
 				@  higher than instruction we want to return to
 	stmfd sp!, {r0-r12, lr}	
 
-	mov r11, $0x20000000			@ basic pending register
-	add r11, r11, $0xb200
-	ldr r8, [r11]
-	ldr r7, =IrqHandler
+	mov r0, $0x20000000			@ basic pending register
+	add r0, r0, $0xb200
+	ldr r8, [r0]
+	ldr r7, IrqHandler
 _irq_source:
 	mov r6, $64
 	and r9, r8, $0x300			@ If pending_1/2 has IRQ save it
@@ -239,6 +225,12 @@ _bit9:
 	bic r10, r10, $(1<<30)			@	also set in basic
 	bal _irq_bit
 
+	.global IrqHandler
+
+IrqHandler:			@ 96 irq handlers pointers
+	.rept 96
+	.word 0
+	.endr
 
 	.global _fiq_interupt
 _fiq_interupt:
@@ -251,7 +243,6 @@ in mem using this funtion which in turn will handle clearing source and do
 other stuff im not sure what less explain it!!!
  thinking r0 will be IRQ number r1 will, be pc of where to branch to 
 TO DO !!!	*/
-
 	
 	.global _arm_timer_interupt
 _arm_timer_interupt:	
@@ -268,15 +259,11 @@ _arm_timer_interupt:
 	str r1, [r3]
 	bl _set_gpio
 	bx r4
+
+
 .data
 .align 2
 
-	.global IrqHandler
-
-IrqHandler:			@ 96 irq handlers pointers
-	.rept 96
-	.word 0
-	.endr
 LedOnOff:
 	.word	0x0
 RegContent:

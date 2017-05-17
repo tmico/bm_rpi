@@ -25,6 +25,8 @@ irq_h:
 fiq_h:
 	.word _fiq_interupt
 
+/* ========= End of section init ========= */
+
 	.section .main
 
 	.global _start
@@ -32,72 +34,7 @@ _start:
 	b _main
 
 	.global _main
-
 _main:
-	/* Turn on green led to inform user system is on */
-	mov r0, $16				@ GPIO led pin 
-	mov r1, $1				@ set to output
-	bl _set_gpio_func 
-
-	mov r0, $16
-	mov r1, $0				@ turn off power turns on led
-	bl _set_gpio
-
-_init_arm_timer:
-	/* seting up timer (The interrupt handler makes green led blink */
-
-	mov r0, $0x6a000			@ tiny fraction under 1/2 sec
-	bl _set_arm_timer
-
-	/* setup uart and send welcome text */
-_uart_print:
-	ldr r0, =Text1
-	bl _uart_ctr
-
-	ldr r0, =VirusAscii
-	bl _uart_ctr
-
-
-@	b _Bloop	
-
-_setup_framebuffer:
-	/* To use defaults set in framebuffer.s set r0 to zero.
-	 * Otherwise r0 is virtual width, r1 virtual height and r2 is colour 
-	 * depth  */
-
-	mov r0, $1280				@ 1280
-	mov r1, $720				@ 720
-	mov r2, $32
-	bl _init_framebuffer
-	teq r0, $0				@ zero returned = error
-	beq _error$
-
-	/* getting framebuffer address to send via uart */
-	bl _graphics_adr
-	ldr r3, =GraphicsAdr			@ str GPU addr in r0
-	ldr r1, [r3]				@ ldr the GPU adr
-	ldr r0, =hfs				@ ldr hex format specifier
-	bl _kprint				@ kprint will put it in StOut
-
-	cmp r0, $0
-	mov r0, r1
-	bleq _uart_ctr
-	cmp r0, $1
-	@bl _rxtx_char
-
-	/* set backgroung colour to black in frame buffer*/
-_set_fb_colour:
-	mvn r0, $0xff000000
-	bl _fg_colour
-
-	/* Display welcome text */
-	ldr r1, =Text1
-	ldr r2, =Text1lng
-	bl _write_tfb
-
-	cmp r0, $0
-	blne _clrscr_dma0
-	bl _display_tfb
 
 	/* routine to move around the screen fabienne's pic*/
 _L0:

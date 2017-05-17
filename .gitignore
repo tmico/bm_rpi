@@ -1,5 +1,6 @@
 *.[o]
 *.~
+*~
 *.patch
 kernel.*
 zimage
