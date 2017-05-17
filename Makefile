@@ -64,9 +64,9 @@ $(TARGET) : $(BUILD)output.elf
 # Rule to make gzip'ed image
 $(TARGETGZ) : $(TARGET)
 	gzip -k -f $(TARGET)
-	
+
 # Rule to make uboot images
-uimage:  $(UIMAGE) $(ZIMAGE) $(TARGETGZ) 
+uimage:  $(UIMAGE) $(ZIMAGE) $(TARGETGZ)
 
 $(UIMAGE) : $(TARGET)
 	@ echo "Invoking mkimage to make an uncompressed image"
@@ -99,7 +99,7 @@ $(BUILD_GDB):
 	mkdir $@
 
 # Rule to clean files.
-clean : 
+clean :
 	-rm -rf $(BUILD)
 	-rm -f $(TARGET)
 	-rm -f $(LIST)
