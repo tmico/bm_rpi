@@ -32,41 +32,70 @@ _reset:
 	   handler. pc is loaded the correct address found at pc + 5instruction
 	   mem block 0x20 to 0x38 holds these correct addresses
 	*/   
-	mov r1, $0x8000
+	/*mov r1, $0x8000		
 	mov r0, $0x0000
 	ldmia r1!, {r4 - r11}
 	stmia r0!, {r4 - r11}
 	ldmia r1!, {r4 - r11}
 	stmia r0!, {r4 - r11}
-
-	/* Enable branch prediction in System Control coprocessor (CP15) and
-	/*  enable instruction cache  
-	/* mcr p15, 0, <rd>, c1, c0, 0  ; Read Control Register configuration
-	/* mrc p15, 0, <rd>, c1, c0, 0  ; write Control Register configuration
-	/*  bits [11] - branch prediction, [12] - L1 intruction cache
-	mcr p15, 0, r0, c7, c5, 6	@ flush branch target cache
-	mcr p15, 0, r0, c7, c5, 4	@ flush prefetch buffer
-	mcr p15, 0, r0, c7, c5, 0	@ invalidate I cache and flush btac
 	*/
+	mov r0, $0
+	mov r1, $0xea000000			@ op code for b[ranch]
+	ldr r4, =_reset
+	ldr r5, =_undefined
+	ldr r6, =_swi
+	ldr r8, =_pre_abort
+	ldr r9, =_data_abort
+	ldr r10, =_irq_interupt
+	ldr r11, =_fiq_interupt
 
-	mrc p15, 0, r0, c1, c0, 0	@ read control reg of p15
-	mov r1, $0x1800			@ bits 11 and 12 enable I and Z
+	sub r5, r5, $0x04			@ need to adjust for relative
+	sub r6, r6, $0x08			@  offset
+	sub r7, r7, $0x0c
+	sub r8, r8, $0x10
+	sub r9, r9, $0x14
+	sub r10, r10, $0x18
+	sub r11, r11, $0x1c
+
+	mov r4, r4, lsr $2			@ the offset is right shiffted
+	mov r5, r5, lsr $2			@  as an operand two places
+	mov r6, r6, lsr $2
+	mov r7, r7, lsr $2
+	mov r8, r8, lsr $2
+	mov r9, r9, lsr $2
+	mov r10, r10, lsr $2
+	mov r11, r11, lsr $2
+
+	orr r4, r4, r1				@ Put addr and b together
+	orr r5, r5, r1
+	orr r6, r6, r1
+	orr r7, r7, r1
+	orr r8, r8, r1
+	orr r9, r9, r1
+	orr r10, r10, r1
+	orr r11, r11, r1
+
+	stm r0, {r4 - r11}			@ write a vector table
+
+	/* Enable branch prediction and instruction cache in p15 */
+	mrc p15, 0, r0, c1, c0, 0		@ read control reg of p15
+	mov r1, $0x1800				@ bits 11 and 12 enable I and Z
 	orr r0, r0, r1
-	bic r0, r0, $0x1		@ Disable the mmu (M)
-	bic r0, r0, $0x2		@ Disable strict alignment (A)
-	bic r0, r0, $0x4		@ Disable unified/Data cache (C)
-	bic r0, r0, $0x80		@ Little endian system (B)
-	bic r0, r0, $0x100		@ Disable system protection (S)
-	bic r0, r0, $0x200		@ Disable rom protection (R)
-	bic r0, r0, $0x2000		@ clear = low exception vector (V)
-	mcr p15, 0, r0, c1, c0, 0	@ write to control reg of c15
+	bic r0, r0, $0x1			@ Disable the mmu (M)
+	bic r0, r0, $0x2			@ Disable strict alignment (A)
+	bic r0, r0, $0x4			@ Disable unified/Data cache (C)
+	bic r0, r0, $0x80			@ Little endian system (B)
+	bic r0, r0, $0x100			@ Disable system protection (S)
+	bic r0, r0, $0x200			@ Disable rom protection (R)
+	bic r0, r0, $0x2000			@ clear = low exception vector (V)
+	mcr p15, 0, r0, c1, c0, 0		@ write to control reg of c15
 
 	/* Set VBAR to zero (reset value) */
 	mov r0, $0x0
 	mcr p15, 0, r0, c12, c0, 0
 
 	mov r0, $0x00
-	mcr p15, 0, r0, c7, c7, 0	@ invalidate both caches and flush btac
+	mcr p15, 0, r0, c7, c7, 0		@ invalidate caches, flush btac
 
 	/* set up a temperory stack pointer and inititalize peripheral hardware
 	 * such as uart, gpu framebuffer, timer etc */
@@ -251,7 +280,7 @@ _arm_timer_interupt:
 	add r2, r2, $0xb000
 	mov r5, $1
 	str r5, [r2, $0x40c]
-	ldr r3, = LedOnOff
+	ldr r3, =LedOnOff
 	ldr r1, [r3]
 	mov r0, $16
 	mov r4, lr				@ preserv lr

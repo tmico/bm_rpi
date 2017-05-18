@@ -1,12 +1,11 @@
 ###############################################################################
-#	makefile
-#	 by Alex Chadwick
 #
 #	A makefile script for generation of raspberry pi kernel images.
+#
+#
 ###############################################################################
 
-# The toolchain to use. arm-none-eabi works, but there does exist 
-# arm-bcm2708-linux-gnueabi.
+# The compiler to use
 ARMGNU ?= arm-none-eabi
 
 # ASFLAGS for debugging
@@ -42,7 +41,7 @@ GDBELF = gdb.elf
 # The name of the linker script to use.
 LINKER = kernel.ld
 
-# The names of all object files that must be generated. Deduced from the 
+# The names of all object files that must be generated. Deduced from the
 # assembly code files in source.
 OBJECTS := $(patsubst $(SOURCE)%.s,$(BUILD)%.o,$(wildcard $(SOURCE)*.s))
 # OBJECTS_GDB := $(patsubst $(SOURCE)%.s,$(BUILD_GDB)%.o,$(wildcard $(SOURCE)*.s))
@@ -59,14 +58,17 @@ $(LIST) : $(BUILD)output.elf
 
 # Rule to make the image file.
 $(TARGET) : $(BUILD)output.elf
-	$(ARMGNU)-objcopy $(BUILD)output.elf -O binary $(TARGET) 
+	$(ARMGNU)-objcopy $(BUILD)output.elf -O binary $(TARGET)
 
 # Rule to make gzip'ed image
 $(TARGETGZ) : $(TARGET)
 	gzip -k -f $(TARGET)
 
-# Rule to make uboot images
-uimage:  $(UIMAGE) $(ZIMAGE) $(TARGETGZ)
+# Rule to make uncompressed uimage
+uimage :  $(UIMAGE)
+
+# Rule to make compressed zimage
+zimage :  $(ZIMAGE)
 
 $(UIMAGE) : $(TARGET)
 	@ echo "Invoking mkimage to make an uncompressed image"

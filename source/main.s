@@ -1,4 +1,5 @@
 	.section .init				@ initialize this section first
+	b _reset
 _reloc_exeption_image:
 	.word 0xe59ff018		@ = ldr pc, [pc, #24]
 	.word 0xe59ff018
@@ -8,21 +9,14 @@ _reloc_exeption_image:
 	.word 0xe59ff018
 	.word 0xe59ff018
 	.word 0xe59ff018
-reset_h:
+
 	.word _reset
-undefined_h:
 	.word _undefined
-swi_h:
 	.word _swi
-pre_abort_h:
 	.word _pre_abort
-data_abort_h:
 	.word _data_abort
-reserved_h:
 	.word _reserved
-irq_h:
 	.word _irq_interupt
-fiq_h:
 	.word _fiq_interupt
 
 /* ========= End of section init ========= */
@@ -53,6 +47,7 @@ _L1:
 
 	bl _display_pic
 	
+	b _Bloop
 /*****************************************************************************/
 /************** Testing *** Code *****************/
 @testing transfer speeds between dma & cpu
@@ -89,6 +84,7 @@ _1:
 	b _L1
 */
 _Bloop:						
+	nop
 	b _Bloop	@ Catch all loop
 
 	.global _error$
@@ -97,8 +93,6 @@ _error$:
 	bl _set_arm_timer
 
 	b _Bloop
-hfs:
-	.asciz "Graphics address: %x\n"
 
 	.data
 	.align 2

@@ -82,3 +82,6 @@ _boot_seq:
 	
 	/* End of init peripheral. Continue with rest of boot */
 	ldmfd sp!, {pc}
+
+hfs:
+	.asciz "Graphics address: %x\n"
