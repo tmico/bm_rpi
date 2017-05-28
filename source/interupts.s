@@ -27,20 +27,12 @@ _reset:
 	mov r0, $0x13
 	msr cpsr_c, r0
 
-	/* Create a vector table to deal with exeptions. 
-	   populate 0x00 to 0x1c with ldr pc instructions to jump to correct
-	   handler. pc is loaded the correct address found at pc + 5instruction
-	   mem block 0x20 to 0x38 holds these correct addresses
-	*/   
-	/*mov r1, $0x8000		
-	mov r0, $0x0000
-	ldmia r1!, {r4 - r11}
-	stmia r0!, {r4 - r11}
-	ldmia r1!, {r4 - r11}
-	stmia r0!, {r4 - r11}
-	*/
-	mov r0, $0
-	mov r1, $0xea000000			@ op code for b[ranch]
+	/* Populate vector table with [b <exception_lable>]. the exception
+	 * lable is calculated by finding its absolute address minus 8 (b is same
+	 * as [add pc, pc, addr]) minus address in mem of its location (eg for
+	 * irq, its address location is 0x18) and then finally right shifted 2
+	 * places
+	 */
 	ldr r4, =_reset
 	ldr r5, =_undefined
 	ldr r6, =_swi
@@ -48,14 +40,17 @@ _reset:
 	ldr r9, =_data_abort
 	ldr r10, =_irq_interupt
 	ldr r11, =_fiq_interupt
+	mov r0, $0x00
+	mov r1, $0xea000000			@ op code for b[ranch]
 
-	sub r5, r5, $0x04			@ need to adjust for relative
-	sub r6, r6, $0x08			@  offset
-	sub r7, r7, $0x0c
-	sub r8, r8, $0x10
-	sub r9, r9, $0x14
-	sub r10, r10, $0x18
-	sub r11, r11, $0x1c
+	sub r4, r4, $0x08			@ need to adjust for relative
+	sub r5, r5, $0x0b			@  offset. 
+	sub r6, r6, $0x10
+	sub r7, r7, $0x14
+	sub r8, r8, $0x18
+	sub r9, r9, $0x1b
+	sub r10, r10, $0x20
+	sub r11, r11, $0x24
 
 	mov r4, r4, lsr $2			@ the offset is right shiffted
 	mov r5, r5, lsr $2			@  as an operand two places
@@ -75,27 +70,7 @@ _reset:
 	orr r10, r10, r1
 	orr r11, r11, r1
 
-	stm r0, {r4 - r11}			@ write a vector table
-
-	/* Enable branch prediction and instruction cache in p15 */
-	mrc p15, 0, r0, c1, c0, 0		@ read control reg of p15
-	mov r1, $0x1800				@ bits 11 and 12 enable I and Z
-	orr r0, r0, r1
-	bic r0, r0, $0x1			@ Disable the mmu (M)
-	bic r0, r0, $0x2			@ Disable strict alignment (A)
-	bic r0, r0, $0x4			@ Disable unified/Data cache (C)
-	bic r0, r0, $0x80			@ Little endian system (B)
-	bic r0, r0, $0x100			@ Disable system protection (S)
-	bic r0, r0, $0x200			@ Disable rom protection (R)
-	bic r0, r0, $0x2000			@ clear = low exception vector (V)
-	mcr p15, 0, r0, c1, c0, 0		@ write to control reg of c15
-
-	/* Set VBAR to zero (reset value) */
-	mov r0, $0x0
-	mcr p15, 0, r0, c12, c0, 0
-
-	mov r0, $0x00
-	mcr p15, 0, r0, c7, c7, 0		@ invalidate caches, flush btac
+	stmia r0, {r4 - r11}			@ write a vector table
 
 	/* set up a temperory stack pointer and inititalize peripheral hardware
 	 * such as uart, gpu framebuffer, timer etc */
@@ -215,7 +190,7 @@ _irq_interupt:
 	mov r0, $0x20000000			@ basic pending register
 	add r0, r0, $0xb200
 	ldr r8, [r0]
-	ldr r7, IrqHandler
+	ldr r7, =IrqHandler
 _irq_source:
 	mov r6, $64
 	and r9, r8, $0x300			@ If pending_1/2 has IRQ save it
@@ -287,6 +262,8 @@ _arm_timer_interupt:
 	eor r1, r1, $1
 	str r1, [r3]
 	bl _set_gpio
+	ldr r0, =A
+	bl _uart_ctr
 	bx r4
 
 
@@ -295,6 +272,9 @@ _arm_timer_interupt:
 
 LedOnOff:
 	.word	0x0
+A:
+	.asciz "A"
+	
 RegContent:
 	.asciz "\ncpsr: %d\npc_old: %d\nException: %s\nr12: %d\nr11: %d\n \
 r10: %d\nr9: %d\nr8: %d\nr7: %d\nr6: %d\nr5: %d\nr4: %d\nr3: %d\nr2: %d\n \

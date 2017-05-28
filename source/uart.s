@@ -131,6 +131,17 @@ _uart_ctr:
 	*/
 	/* TODO add checks not reciving data before sending, disable receive bit while sending */
 
+	/*
+	ldr r0, =UartLck
+	mov r1, $1
+	ldrex r2, [r0]
+	cmp r2, r1
+	beq _uart_ctr
+	strex r2, r1, [r0]			@ Attempt to lock it
+	cmp r2, $0				@ 0 = success, 1 = fail
+	bne _uart_ctr
+	*/
+
 	ldr r3, =UartLck
 	mov r2, $1				@ 1 = in use, 0 free mutex
 	swp r2, r2, [r3]			@ semaphore: atomic ldr and str
@@ -155,6 +166,7 @@ _ctr:
 	cmp r1, $0
 	bleq _uart_put_buffer
 
+	/* branch to put chars on the uart fifo */
 	bl _uart_puts
 	cmp r0, $1				@ has it completed?
 	subeq pc, pc, $16
@@ -278,7 +290,7 @@ _ur2:
 	tst r2, $(1<<3)
 	bne _ur2				@ ensure not busy
 
-	ldr r12, =UartRxBuffer			@ ldr the rx buffer
+	mov r12, $0xf9000
 
 	/* Finally get to recieve something */
 	/* 1 off tst that fifo filling. ldrb from dr reg, cmp data 0,
@@ -350,11 +362,6 @@ UartLck:
 	.word 0
 
 UartTxBuffer:
-	.rept 0x80				@ 128 byte buffer
-	.byte 0
-	.endr
-
-UartRxBuffer:
 	.rept 0x80				@ 128 byte buffer
 	.byte 0
 	.endr

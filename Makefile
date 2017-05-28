@@ -14,9 +14,6 @@ ASFLAGS = -g
 # The intermediate directory for compiled object files.
 BUILD = build/
 
-# The intermediate directory for compiled object files with debug enabled
-BUILD_GDB = build_dbg/
-
 # The directory in which source files are stored.
 SOURCE = source/
 
@@ -44,10 +41,9 @@ LINKER = kernel.ld
 # The names of all object files that must be generated. Deduced from the
 # assembly code files in source.
 OBJECTS := $(patsubst $(SOURCE)%.s,$(BUILD)%.o,$(wildcard $(SOURCE)*.s))
-# OBJECTS_GDB := $(patsubst $(SOURCE)%.s,$(BUILD_GDB)%.o,$(wildcard $(SOURCE)*.s))
 
 # Rule to make everything.
-all: $(TARGET) $(LIST)#$(GDBELF)
+all: $(TARGET) $(LIST) $(UIMAGE) $(ZIMAGE)
 
 # Rule to remake everything. Does not include clean.
 rebuild: all
@@ -64,12 +60,6 @@ $(TARGET) : $(BUILD)output.elf
 $(TARGETGZ) : $(TARGET)
 	gzip -k -f $(TARGET)
 
-# Rule to make uncompressed uimage
-uimage :  $(UIMAGE)
-
-# Rule to make compressed zimage
-zimage :  $(ZIMAGE)
-
 $(UIMAGE) : $(TARGET)
 	@ echo "Invoking mkimage to make an uncompressed image"
 	mkimage -A arm -T kernel -C none -a 0x8000 -e 0x8000 -n "virus-0.0" -d kernel.img  $(UIMAGE)
@@ -79,13 +69,13 @@ $(ZIMAGE) : $(TARGETGZ)
 	mkimage -A arm -T kernel -C gzip -a 0x8000 -e 0x8000 -n "virus-0.0" -d kernel.img.gz $(ZIMAGE)
 
 # Rule to make the elf file.
-$(BUILD)output.elf : $(OBJECTS) $(LINKER)
+$(BUILD)output.elf : $(OBJECTS)
 	$(ARMGNU)-ld --no-undefined $(OBJECTS) -Map $(MAP) -o $(BUILD)output.elf -T $(LINKER)
 
 # Rule to make gdb friendly file.
-$(GDBELF) : $(OBJECTS_GDB) $(LINKER)
+$(GDBELF) : $(OBJECTS_GDB)
 	$(ARMGNU)-ld $(OBJECTS_GDB) -o $(BUILD_GDB)$(GDBELF) -T $(LINKER)
-#
+
 # Rule to make the object files.
 $(BUILD)%.o: $(SOURCE)%.s $(BUILD)
 	$(ARMGNU)-as -I $(SOURCE) $< -o $@

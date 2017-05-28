@@ -1,23 +1,5 @@
 	.section .init				@ initialize this section first
 	b _reset
-_reloc_exeption_image:
-	.word 0xe59ff018		@ = ldr pc, [pc, #24]
-	.word 0xe59ff018
-	.word 0xe59ff018
-	.word 0xe59ff018
-	.word 0xe59ff018
-	.word 0xe59ff018
-	.word 0xe59ff018
-	.word 0xe59ff018
-
-	.word _reset
-	.word _undefined
-	.word _swi
-	.word _pre_abort
-	.word _data_abort
-	.word _reserved
-	.word _irq_interupt
-	.word _fiq_interupt
 
 /* ========= End of section init ========= */
 
@@ -33,8 +15,8 @@ _main:
 	/* routine to move around the screen fabienne's pic*/
 _L0:
 	ldr r10, = FabPic
-	ldrd r8, r9, [r10, $0x10]		@ 0x10 - dimentions of pic
-	rsb r6, r8, $0x500			@  to get range for x and y
+	ldrd r8, r9, [r10, $0x10]		@ 0x10 - dimentions of pic ...
+	rsb r6, r8, $0x500			@ ...to get range for x and y
 	rsb r7, r9, $0x2b0			@ 720-32-height = range for y
 
 _L1:
@@ -47,13 +29,13 @@ _L1:
 
 	bl _display_pic
 	
-	b _Bloop
 /*****************************************************************************/
 /************** Testing *** Code *****************/
 @testing transfer speeds between dma & cpu
 	@bl _test_speeds
 @	nop
 @ testing soft system reboot
+	b _Bloop
 	ldr r0, =RebootMsg
 	bl _kprint
 	mov r0, r1
@@ -96,8 +78,29 @@ _error$:
 
 	.data
 	.align 2
-	.global SysTimer
-SysTimer:
-	.int 0x00
 RebootMsg:
 	.asciz "The Pi Zero is rebooting"
+
+
+	/* Old code not brought myself to delete yet as i may change my mind
+	 * and want to use it
+	 */
+
+_reloc_exeption_image:
+	.word 0xe59ff018		@ = ldr pc, [pc, #24]
+	.word 0xe59ff018
+	.word 0xe59ff018
+	.word 0xe59ff018
+	.word 0xe59ff018
+	.word 0xe59ff018
+	.word 0xe59ff018
+	.word 0xe59ff018
+
+	.word _reset
+	.word _undefined
+	.word _swi
+	.word _pre_abort
+	.word _data_abort
+	.word _reserved
+	.word _irq_interupt
+	.word _fiq_interupt
