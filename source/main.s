@@ -34,8 +34,21 @@ _L1:
 @testing transfer speeds between dma & cpu
 	@bl _test_speeds
 @	nop
-@ testing soft system reboot
+@ testing stuff
+ex:	
+	ldr r0, =TstLock
+	mov r1, $1
+	ldrex r2, [r0]
+	cmp r2, $0				@ free?
+	strexeq r2, r1, [r0]			@ Attempt to lock it
+	cmp r2, $0				@ 0 = success, 1 = fail
+	bne ex
+	svc 0
+	ldr r0, =TstLock
+	mov r1, $0
+	str r1, [r0]				@ Attempt to free it
 	b _Bloop
+	
 	ldr r0, =RebootMsg
 	bl _kprint
 	mov r0, r1
@@ -81,6 +94,8 @@ _error$:
 RebootMsg:
 	.asciz "The Pi Zero is rebooting"
 
+TstLock:
+	.int 0
 
 	/* Old code not brought myself to delete yet as i may change my mind
 	 * and want to use it

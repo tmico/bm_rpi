@@ -33,7 +33,7 @@
 	.global _uart_ctr
 	.global _uart_r
 	.global _rxtx_char
-
+	.global _uart_exep
 _uart_init:
 	/* Entry point to this function is from uart_ctr. _uart_init is a once only
 	   function to prepare (or reset) pins as i don't know what state u-boot
@@ -127,27 +127,24 @@ _uart_ctr:
 	/* To enable transmision, disable uart, wait for end of transmision,
 	   flush fifo by seting fen bit to 0 in uart_lcrh, reprogram uart_cr,
 	   enable uart.
-	   swp instruction used to implement a mutex with UartLck 
-	*/
-	/* TODO add checks not reciving data before sending, disable receive bit while sending */
-
-	/*
-	ldr r0, =UartLck
-	mov r1, $1
-	ldrex r2, [r0]
-	cmp r2, r1
-	beq _uart_ctr
-	strex r2, r1, [r0]			@ Attempt to lock it
-	cmp r2, $0				@ 0 = success, 1 = fail
-	bne _uart_ctr
-	*/
-
+	   swp instruction used to implement a mutex with UartLck pre armv6
 	ldr r3, =UartLck
 	mov r2, $1				@ 1 = in use, 0 free mutex
 	swp r2, r2, [r3]			@ semaphore: atomic ldr and str
 	cmp r2, $0				@ can we carry on?
-	movne r0, $1				@ if not return 1 for blocked
-	bxne lr
+	bne _uart_ctr				@ a spin lock
+	armv6 it is recomened to use ldrex/strex to implement a mutex. 
+	*/
+	/* TODO add checks not reciving data before sending, disable receive bit while sending */
+
+
+	ldr r3, =UartLck
+	mov r1, $1
+	ldrex r2, [r3]
+	cmp r2, $0				@ free?
+	strexeq r2, r1, [r3]			@ Attempt to lock it
+	cmpeq r2, $1				@ 0 = success, 1 = fail
+	beq _uart_ctr
 
 	stmfd sp!, {r4, r5, lr}
 	ldr r5, =UartInfo
@@ -177,9 +174,12 @@ _ctr:
 	bne _ctr
 
 	ldr r3, =UartLck			@ unlock
-	mov r2, $0
-	swp r2, r2, [r3]
+	mov r1, $0
+	str r1, [r3]			
+
 	ldmfd sp!, {r4, r5, pc}
+UartLck:
+	.word 0
 
 	/*Tranfer from address in r0 into UartTxBuffer. Number of char (bytes)
 	  is put into r12 */
@@ -358,8 +358,6 @@ UartInfo:
 	.word 0		@ #8 BufferFill, no of chars in buffer
 	.word 0		@ #12 string address
 
-UartLck:
-	.word 0
 
 UartTxBuffer:
 	.rept 0x80				@ 128 byte buffer

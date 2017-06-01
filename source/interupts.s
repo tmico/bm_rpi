@@ -75,7 +75,6 @@ _reset:
 	/* set up a temperory stack pointer and inititalize peripheral hardware
 	 * such as uart, gpu framebuffer, timer etc */
 	mov sp, $0x8000
-	bl _boot_seq
 
 	/* Set up the stack pointers for different cpu modes */
 	mov r0, $0x11			@ Enter FIQ mode
@@ -98,6 +97,7 @@ _reset:
 	orr r0, r0, $0xc0
 	msr cpsr, r0
 	mov sp, $0x7000			@ set its stack pointer
+	bl _boot_seq
 
 	mov r0, $0x17			@ Enter ABORT mode
 	msr cpsr, r0			@ ensure irq and fiq are disabled
@@ -121,39 +121,81 @@ _reset:
 
 	.global _undefined
 _undefined:
-	b _undefined
+	ldr r0, =Abort
+	mov r1, pc
+	sub r2, lr, $4
+	nop
+	nop
+	bl _kprint
+	mov r0, r1
+	bl _uart_ctr
+ud:
+	b ud
 
 	.global _swi
 _swi:
-
-	stmfd sp!, {r0-r12, lr}	 	@ unlike IRQ/FIQ lr is pc +4 needs checking
+	stmfd sp!, {r0 - r12, lr}	 	@ unlike IRQ/FIQ lr is pc +4 
+	clrex
 	/* going to print to contents of all the registers inc spsr - 
 		for degbuging reasons
+	mrs r0, cpsr
+	bic r0, r0, $(1<<7)			@ re-enable interupts
+	bic r0, r0, $(1<<6)			@ re-enable fiq
+	msr cpsr, r0
 	*/
-
-	stmfd sp!, {r0 - r12}			@ load stack with args to print
 	ldr r0, =RegContent
 	mrs r1, spsr
 	sub r2, lr, $4				@ when the excepton happend
 	ldr r3, =SwiLable
 	bl _kprint
-	bl _write_tfb
-	cmp r0, $0				@ clear screen?
-	blne _clrscr_dma0
-	bl _display_tfb
+	mov r0, r1
+	bl _uart_ctr
+
+	mrs r0, cpsr
+	orr r0, r0, $(1<<7)			@ disable interupts
+	orr r0, r0, $(1<<6)			@ disable fiq
+	msr cpsr, r0
+	str r2, [r0]				@ clear lock
 	ldmfd sp!, {r0-r12, pc}^		@ return from svr/swi
 
 	.global _pre_abort
 _pre_abort:
-	b _pre_abort
+	ldr r0, =Abort
+	mov r1, pc
+	sub r2, lr, $4
+	nop
+	nop
+	bl _kprint
+	mov r0, r1
+	bl _uart_ctr
+pa:
+	b pa
 
 	.global _data_abort
 _data_abort:
-	b _data_abort
+	ldr r0, =Abort
+	mov r1, pc
+	sub r2, lr, $4
+	nop
+	nop
+	bl _kprint
+	mov r0, r1
+	bl _uart_ctr
+da:	
+	b da
 
 	.global _reserved
 _reserved:
-	b _reserved
+	ldr r0, =Abort
+	mov r1, pc
+	sub r2, lr, $4
+	nop
+	nop
+	bl _kprint
+	mov r0, r1
+	bl _uart_ctr
+rsrvd:	
+	b rsrvd
 
 /* IRQ. The PI has NO interupt vector module. It has 3 pending registers with
    some IRQ from pending_1 and pending_2 also duplicated in pending_basic. Bits
@@ -186,6 +228,7 @@ _irq_interupt:
 	sub lr, lr, $4		@ pc -> lr when interupt occurs which is $4
 				@  higher than instruction we want to return to
 	stmfd sp!, {r0-r12, lr}	
+	clrex
 
 	mov r0, $0x20000000			@ basic pending register
 	add r0, r0, $0xb200
@@ -276,8 +319,10 @@ A:
 	.asciz "A"
 	
 RegContent:
-	.asciz "\ncpsr: %d\npc_old: %d\nException: %s\nr12: %d\nr11: %d\n \
-r10: %d\nr9: %d\nr8: %d\nr7: %d\nr6: %d\nr5: %d\nr4: %d\nr3: %d\nr2: %d\n \
-r1: %d\nr0: %d"
+	.asciz "\ncpsr: %x\npc_old: %x\nException: %s\nr12: %x\nr11: %x\n 
+r10: %x\nr9: %x\nr8: %x\nr7: %x\nr6: %x\nr5: %x\nr4: %x\nr3: %x\nr2: %x\n 
+r1: %x\nr0: %x\n"
 SwiLable:
 	.asciz "SRV/SWI"
+Abort:
+	.asciz "PC is %x\nlr is %x\n"
