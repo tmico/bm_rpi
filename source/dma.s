@@ -96,7 +96,8 @@ _clrscr_dma0:
 	str r3, [r0, #8]			@ put it in CB DEST_AD
 	
 	/* SOURCE_AD */
-	ldr r2, =ScreenBuffer
+	ldr r1, =TermInfo
+	ldr r2, [r1]				@ Get addr of Framebuffer
 	str r2, [r0, #4]			@ put SB into SOURCE_AD
 
 	/* TXFR_LEN */

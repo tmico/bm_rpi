@@ -117,3 +117,71 @@ _set_pixel16:
 	ldr r2, [r1]	
 	strh r2, [r0]
 	bx lr					@ exit
+
+	.global _draw_char
+_draw_char:
+	stmfd sp!, {r4,r5,r10}
+	ldr r4, =FramebufferInfo		@ Get n.o pixels across
+	ldr r12, =GraphicsAdr
+	mov r3, r3, lsl $4			@ r3 = y pixel line number
+	ldr r5, [r4]				@ r5 = pixels per line
+	mov r2, r2, lsl $3			@ r2 = x pixels across
+	ldr r4, [r12]				@ r4 = gpu frambuffer adr
+
+	ldr r10, =cga_16color			@ 16 colour code table
+	mla r12, r3, r5, r2			@ r12 = framebuffer pixel offset
+
+	and r1, r0, $0xf00
+	mov r1, r1, lsr $8			@ fg colour
+	and r2, r0, $0xf000
+	mov r2, r2, lsr $12			@ bg colour
+	ldr r1, [r10, r1]
+	ldr r2, [r10, r2]
+		
+	ldr r3, =Uvga16
+	sub r0, r0, $0x20			@ glyph offset = ascii - 0x20
+	add r12, r12, r4			@ r12 = pixel gpu addr= 
+
+	ldrb r10, [r3, r10]!			@ load 1st line of bitmap
+	mov r4, $16				@ n.o of lines loop
+
+	/* r0=scratch, r1=fg, r2=bg, r3=glyph addr, r4=line counter, 
+	   r5=pixel/line, r12=pixel addr */
+_read_bit_loop:
+	tst r10, $0x80
+	strne r2, [r12]
+	streq r1, [r12]
+	tst r10, $0x40
+	strne r2, [r12, $4]
+	streq r1, [r12, $4]
+	tst r10, $0x20
+	strne r2, [r12, $8]
+	streq r1, [r12, $8]
+	tst r10, $0x10
+	strne r2, [r12, $12]
+	streq r1, [r12, $12]
+	tst r10, $0x08
+	strne r2, [r12, $16]
+	streq r1, [r12, $16]
+	tst r10, $0x04
+	strne r2, [r12, $20]
+	streq r1, [r12, $20]
+	tst r10, $0x02
+	strne r2, [r12, $24]
+	streq r1, [r12, $24]
+	tst r10, $0x01
+	strne r2, [r12, $28]
+	streq r1, [r12, $28]
+
+	subs r4, r4, $1
+	addne r12, r12, r5, lsl $2		@ Adjust pixel addr to nxt line
+	ldrneb r10, [r3, $1]!
+	bne _read_bit_loop
+
+	ldmfd sp!, {r4,r5,r10}
+	bx lr
+
+	.data
+	.align 2
+Uvga16:
+	.incbin "u_vga16.psf"
