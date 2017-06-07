@@ -72,31 +72,30 @@ _reset:
 
 	stmia r0, {r4 - r11}			@ write a vector table
 
-	/* set up a temperory stack pointer and inititalize peripheral hardware
-	 * such as uart, gpu framebuffer, timer etc */
-	mov sp, $0x8000
-
 	/* Set up the stack pointers for different cpu modes */
 	mov r0, $0x11			@ Enter FIQ mode
 	msr cpsr, r0			@ ensure irq and fiq are disabled
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0x8000			@ set its stack pointer
+	mov sp, $0x3000			@ set its stack pointer
 
 	mov r0, $0x12			@ Enter IRQ mode
 	msr cpsr, r0			@ ensure irq and fiq are disabled
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0x8000			@ set its stack pointer
+	mov sp, $0x5000			@ set its stack pointer
 
 	mov r0, $0x13			@ Enter SWI mode
 	msr cpsr, r0			@ ensure irq and fiq are disabled
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0x7000			@ set its stack pointer
+	mov sp, $0x4000			@ set its stack pointer
+
+	/* inititalize peripheral hardware such as uart, gpu framebuffer, 
+	 * timer etc */
 	bl _boot_seq
 
 	mov r0, $0x17			@ Enter ABORT mode
@@ -104,28 +103,26 @@ _reset:
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0x8000			@ set its stack pointer
+	mov sp, $0x3000			@ set its stack pointer
 
 	mov r0, $0x1b			@ Enter UNDEFINED mode
 	msr cpsr, r0			@ ensure irq and fiq are disabled
 	mrs r0, cpsr
 	orr r0, r0, $0xc0
 	msr cpsr, r0
-	mov sp, $0xf0000		@ set its stack pointer
+	mov sp, $0x3000			@ set its stack pointer
 
 	mov r0, $0x10
 	msr cpsr, r0			@ User mode | fiq/irq enabled
-	mov sp, $0xF8000
+	mov sp, $0x8000
 
 	b _start
 
 	.global _undefined
 _undefined:
-	ldr r0, =Abort
-	mov r1, pc
+	sub r1, pc, $8				@ Informing via uart what...
+	ldr r0, =Abort				@ ...exception was triggered
 	sub r2, lr, $4
-	nop
-	nop
 	bl _kprint
 	mov r0, r1
 	bl _uart_ctr
@@ -136,8 +133,9 @@ ud:
 _swi:
 	stmfd sp!, {r0 - r12, lr}	 	@ unlike IRQ/FIQ lr is pc +4 
 	clrex
-	/* going to print to contents of all the registers inc spsr - 
-		for degbuging reasons
+	/* GOING to print to contents of all the registers inc spsr - 
+		for degbuging reasons */
+	/*
 	mrs r0, cpsr
 	bic r0, r0, $(1<<7)			@ re-enable interupts
 	bic r0, r0, $(1<<6)			@ re-enable fiq
@@ -160,11 +158,9 @@ _swi:
 
 	.global _pre_abort
 _pre_abort:
-	ldr r0, =Abort
-	mov r1, pc
+	sub r1, pc, $8				@ Informing via uart what...
+	ldr r0, =Abort				@ ...exception was triggered
 	sub r2, lr, $4
-	nop
-	nop
 	bl _kprint
 	mov r0, r1
 	bl _uart_ctr
@@ -173,11 +169,9 @@ pa:
 
 	.global _data_abort
 _data_abort:
-	ldr r0, =Abort
-	mov r1, pc
+	sub r1, pc, $8				@ Informing via uart what...
+	ldr r0, =Abort				@ ...exception was triggered
 	sub r2, lr, $4
-	nop
-	nop
 	bl _kprint
 	mov r0, r1
 	bl _uart_ctr
@@ -186,11 +180,9 @@ da:
 
 	.global _reserved
 _reserved:
-	ldr r0, =Abort
-	mov r1, pc
+	sub r1, pc, $8				@ Informing via uart what...
+	ldr r0, =Abort				@ ...exception was triggered
 	sub r2, lr, $4
-	nop
-	nop
 	bl _kprint
 	mov r0, r1
 	bl _uart_ctr
