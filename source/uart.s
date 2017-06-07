@@ -176,6 +176,7 @@ _ctr:
 	ldr r3, =UartLck			@ unlock
 	mov r1, $0
 	str r1, [r3]			
+	DMB					@ ensure memory is clean
 
 	ldmfd sp!, {r4, r5, pc}
 UartLck:
@@ -262,12 +263,16 @@ _uart_r:
 	/* To enable reception, disable uart, wait for end of transmision/
 	   reception, flush fifo by seting fen bit to 0 in uart_lcrh, 
 	   reprogram uart_cr, enable uart.
-	   swp instruction used to implement a mutex with UartLck 
+	   ldrex/strex instruction used to implement a mutex with UartLck 
 	*/
 	ldr r3, =UartLck
-	mov r2, $1
-	swp r2, r2, [r3]			@ tst if locked for use
-						@  if not lock and continue
+	mov r1, $1
+	ldrex r2, [r3]
+	cmp r2, $0				@ free?
+	strexeq r2, r1, [r3]			@ Attempt to lock it
+	cmpeq r2, $1				@ 0 = success, 1 = fail...
+	bne _uart_r					@ ...if not lock and continue
+
 	cmp r2, $0
 	mvnne r0, $0
 	bxne lr					@ exit if can't continue
@@ -310,7 +315,8 @@ _u_gets:
 	mov r0, $0
 	strb r0, [r12]
 	ldr r3, =UartLck
-	swp r0, r0, [r3]			@ unlock mutex
+	str r0, [r3]
+	DMB					@ unlock mutex
 
 	mov r0, $0xf9000
 	ldmfd sp!, {pc}				@ return
