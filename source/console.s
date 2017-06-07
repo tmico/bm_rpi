@@ -412,7 +412,6 @@ _scroll_screen:
 
 	/* Clear top line of screen */
 	stmfd sp!, {lr}
-	mov r0, r9
 	bl _clear_line
 	ldmfd sp!, {pc}
 
@@ -420,7 +419,7 @@ _clear_line:
 	/* Clear first line of the screen using dma. The control block is
 	   preset with defaults for a 80 char with 8x16 fonts screen. 
 	   r2,r3,r12 free as scratch registers 
-	   r0 = y, r1 =GraphicsAdr
+	   r9 = y, r1 =GraphicsAdr
 	*/
 
 	ldr r1, =GraphicsAdr
@@ -432,11 +431,11 @@ _clear_line:
 	mov r2, $1280
 	ldr r3, [r1]				@ get GraphicsAdr
 	mov r2, r2, lsl $6			@ *64 (*4*16)
-	ldr r12, =CB_ClearLine
-	mla r1, r0, r2, r3			@ * y + GraphicsAdr
+	ldr r0, =CB_ClearLine
+	mla r1, r9, r2, r3			@ * y + GraphicsAdr
 	stmfd sp!, {lr}
-	str r1, [r12, $4]
-	bl _dma_tfr				@ dma will do the rest
+	str r1, [r0, $4]
+	bl _clrl_dma0				@ dma will do the rest
 	ldmfd sp!, {pc}				@ return
 
 
@@ -458,6 +457,7 @@ TermInfo:				@ Data array
 	.word 0x0		@ #36 Cursloc y
 	.word 0x0		@ #40 DTermCur for tty_display
 
+	.global BlankLine
 BlankLine:			@ Empty blank line to clear 8 pixiles in a row
 	.rept 16		@ 128 bit
 	.byte 0x0		@ black
@@ -481,17 +481,6 @@ StdOut:
 	   (TXFR = (hi hw = 16 (y)) (lo hw = 0xa00 (4 (bytes) * 8 (pixels) * 80 (char))
 	   (d_stride = 0x1400 (1280 pixels) - 0xa00 (80 char), s_stride = 0)
 	*/
-	.align 5
-CB_ClearLine:			@ Control Block with some preset values
-	.word	0x23a		@ TI
-	.word	BlankLine	@ #4 SOURCE_AD
-	.word	0x00		@ #8 DEST_AD (CurLine * 16)
-	.word	0xa0a00		@ #12 TXFR_LEN 
-	.word	0xa000000	@ #16 STRIDE 
-	.word	0x00		@ #20 NEXTCNBK
-	.word	0x00		@ #24 Reserved
-	.word	0x00		@ #28 Reserved
-
 	.align 8
 TermBuffer:
 	.rept 128 * 128

@@ -130,8 +130,34 @@ _clrscr_dma0:
 
 	bx lr
 
+	.global _clrl_dma0
+_clrl_dma0:
+	/* A dma transfer to clear a line of text from gpu framebuffer
+	 * Input: R0 = address of Control Block with desired values stored
+	 * Output: N/A
+	 */ 
+	ldr r1, =0x20007000			@ DMA channel 0 addr
+	str r0, [r1, #4]			@ Str the CB
+	mov r2, $0x01
+	str r2, [r0]				@ Activate dma
+
+	bx lr
+
+	
 	.data
 	.align 5
+
+	.global CB_ClearLine
+CB_ClearLine:			@ Control Block with some preset values
+	.word	0x23a		@ TI
+	.word	BlankLine	@ #4 SOURCE_AD
+	.word	0x00		@ #8 DEST_AD (CurLine * 16)
+	.word	0xa0a00		@ #12 TXFR_LEN 
+	.word	0xa000000	@ #16 STRIDE 
+	.word	0x00		@ #20 NEXTCNBK
+	.word	0x00		@ #24 Reserved
+	.word	0x00		@ #28 Reserved
+
 	.global ConBlk_0
 ConBlk_0:
 	.word	0x00	@ TI

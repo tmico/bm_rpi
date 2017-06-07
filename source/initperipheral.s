@@ -106,3 +106,5 @@ _boot_seq:
 	bx lr
 hfs:
 	.asciz "Graphics address: %x\n"
+Text1:	
+        .asciz "\n< Welcome to VIRUS O1 >\n--- Writen in assembler ---\n--- Which is well cool!!! ---\n"
