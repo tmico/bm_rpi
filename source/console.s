@@ -32,24 +32,24 @@
 	*/
 	/* REMINDERS: TermColour needs to be called by _display_tty */
 _tty_console:
-	/* r0 holds current char (byte) address 
+	/* INPUT r0 pointer to current char (byte) address 
 	   
-	   Before loading reg and branching to _tty_write test pointer holds
-	   a valid null terminator and does not excede 4096 bytes
+	   Before loading reg and branching to _tty_write test string holds
+	   a valid null terminator and does not excede 4096 bytes and tfr 
 	*/
 	stmfd sp!, {lr}
 	ldr r1, =StdOut
 	mov r3, r0				@ preserve string addr
 
 	ldrb r2, [r3], $1
+	add r1, r1, $0x1000			@ max allowed
 _chk_size:
 	cmp r2, $0
+	cmpne r3, r1				@ cmp against max allowed
 	ldrneb r2, [r3],$1
 	bne _chk_size
 
-	sub r2, r3, r1				@ chk r0 !> (StdOut+4096)
-	cmp r2, $0x1000				@ treat neg num as large %d
-	mvnhi r0, $0				@ if buffer to big return -1
+	mvnhi r0, $0				@ if string to big return -1
 	bxhi lr
 	
 	push {lr}
