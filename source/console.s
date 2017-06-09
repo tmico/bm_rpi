@@ -30,19 +30,22 @@
 	   then is passed to whichever function is putting char's in the
 	   buffer. The buffer is reset when Base address is started from
 	*/
-	/* REMINDERS: TermColour needs to be called by _display_tty */
 _tty_console:
 	/* INPUT r0 pointer to current char (byte) address 
+		 r1 no. chars to print exl null
+		 r2 append to StdOut or new string. 0 = start, 1 = appened
 	   
 	   Before loading reg and branching to _tty_write test string holds
 	   a valid null terminator and does not excede 4096 bytes and tfr 
 	*/
+	cmp r1, $0x1000
+	movhs r0 $-1
+	bxhs lr					@ return -1 if too many chars
+	
 	stmfd sp!, {lr}
-	ldr r1, =StdOut
+	ldr r2, =StdOut
 	mov r3, r0				@ preserve string addr
-
 	ldrb r2, [r3], $1
-	add r1, r1, $0x1000			@ max allowed
 _chk_size:
 	cmp r2, $0
 	cmpne r3, r1				@ cmp against max allowed
