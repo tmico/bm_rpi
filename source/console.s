@@ -187,42 +187,12 @@ _lf0:
 	ldrb r0, [r10, $1]!			@ get next char
 	b _wtb0
 
-	/* Backspace, a somewhat tricky char to deal with causing complexity!!
-	   cmp StdOut addr with current string address. If same the cannot delete
-	   cmp 1st byte of StdOut. if '' then already deleted back to first 
-	   allowable deletable char.
-	   Now work way back along string finding first available char (ie not
-	   '') to blank out with ''.
-	   Then blank out last char in TermBuffer and adjust cursor back 1
-	   space.
+	/* Backpace. Go back 1 place and (over)write char with \b, (1) test
+	 * to see if beginning of line is reached and thus need to go up
+	 * one line. (2) walk through line to locate \n marker to get last char
+	 * to delete (3) str \b inplace of last char
 	*/
 _BackSpace:
-	ldr r1, =StdOut
-	strh r0, [r11, r5]			@ str to let tty_display know
-	cmp r1, r10				@ if == exit; bs not possible
-	ldrneb r0, [r1]
-	mov r3, r10				@ copy addr in expectation
-	cmpne r0, $'\b'				@ chk if alowed to delete?
-	ldreqb r0, [r10, $1]!
-	beq _wtb0
-
-	/* ldrb last byte, cmp with '\b', if == then go back 1 space untill
-	   first byte != with '\b', and change byte to '\b'. A somewhat kludgy
-	   way to keep a 'record' of what char's can be deleted. Note current
-	   '\b' also has to be blanked out, or when 2 or more '\b' are together
-	   (which often happens from user input!) the latter '\b' loop won't
-	   detect the '7f' 2 bytes away (remember previous byte is tested so if
-	   addr has moved forward 1 byte then previous byte would be '\b' hence
-	   why current '\b' has to be "\b"'d too.
-	*/
-	ldrb r0, [r3, $-1]!
-	mov r1, $'\b'
-	strb r1, [r3, $1]			@ blank or have endless loop
-_bs1:	cmp r0, r1
-	ldreqb r0, [r3, $-1]!
-	beq _bs1
-	strb r1, [r3]
-
 	ldr r2, [r6, $28]			@ get n.o char per line
 	add r4, r4, $1
 	orr r1, r1, r12				@ add term colour
