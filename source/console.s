@@ -44,13 +44,6 @@ _tty_console:
 	
 	stmfd sp!, {lr}
 	ldr r2, =StdOut
-	mov r3, r0				@ preserve string addr
-	ldrb r2, [r3], $1
-_chk_size:
-	cmp r2, $0
-	cmpne r3, r1				@ cmp against max allowed
-	ldrneb r2, [r3],$1
-	bne _chk_size
 
 	mvnhi r0, $0				@ if string to big return -1
 	bxhi lr
