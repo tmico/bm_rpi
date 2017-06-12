@@ -18,9 +18,9 @@ BUILD = build/
 SOURCE = source/
 
 # The name of the output files to generate.
-TARGET = kernel.img
+KERNEL = kernel.img
 
-TARGETGZ = kernel.img.gz
+KERNELGZ = kernel.img.gz
 
 UIMAGE = uimage
 
@@ -43,37 +43,37 @@ LINKER = kernel.ld
 OBJECTS := $(patsubst $(SOURCE)%.s,$(BUILD)%.o,$(wildcard $(SOURCE)*.s))
 
 # Rule to make everything.
-all: $(TARGET) $(LIST) $(UIMAGE) $(ZIMAGE)
+all: $(KERNEL) $(LIST) $(UIMAGE) $(ZIMAGE)
 
 # Rule to remake everything. Does not include clean.
-rebuild: all
+rebuild: clean all
 
 # Rule to make the listing file.
-$(LIST) : $(BUILD)output.elf
+$(LIST): $(BUILD)output.elf
 	$(ARMGNU)-objdump -D $(BUILD)output.elf > $(LIST)
 
 # Rule to make the image file.
-$(TARGET) : $(BUILD)output.elf
-	$(ARMGNU)-objcopy $(BUILD)output.elf -O binary $(TARGET)
+$(KERNEL): $(BUILD)output.elf
+	$(ARMGNU)-objcopy $(BUILD)output.elf -O binary $(KERNEL)
 
 # Rule to make gzip'ed image
-$(TARGETGZ) : $(TARGET)
-	gzip -k -f $(TARGET)
+$(KERNELGZ): $(KERNEL)
+	gzip -k -f $(KERNEL)
 
-$(UIMAGE) : $(TARGET)
+$(UIMAGE): $(KERNEL)
 	@ echo "Invoking mkimage to make an uncompressed image"
 	mkimage -A arm -T kernel -C none -a 0x8000 -e 0x8000 -n "virus-0.0" -d kernel.img  $(UIMAGE)
 
-$(ZIMAGE) : $(TARGETGZ)
+$(ZIMAGE): $(KERNELGZ)
 	@ echo "Invoking mkimage to make an compressed image"
 	mkimage -A arm -T kernel -C gzip -a 0x8000 -e 0x8000 -n "virus-0.0" -d kernel.img.gz $(ZIMAGE)
 
 # Rule to make the elf file.
-$(BUILD)output.elf : $(OBJECTS)
+$(BUILD)output.elf: $(OBJECTS)
 	$(ARMGNU)-ld --no-undefined $(OBJECTS) -Map $(MAP) -o $(BUILD)output.elf -T $(LINKER)
 
 # Rule to make gdb friendly file.
-$(GDBELF) : $(OBJECTS_GDB)
+$(GDBELF): $(OBJECTS_GDB)
 	$(ARMGNU)-ld $(OBJECTS_GDB) -o $(BUILD_GDB)$(GDBELF) -T $(LINKER)
 
 # Rule to make the object files.
@@ -91,11 +91,11 @@ $(BUILD_GDB):
 	mkdir $@
 
 # Rule to clean files.
-clean :
+clean:
 	-rm -rf $(BUILD)
-	-rm -f $(TARGET)
+	-rm -f $(KERNEL)
 	-rm -f $(LIST)
 	-rm -f $(MAP)
-	-rm -f $(TARGETGZ)
+	-rm -f $(KERNELGZ)
 	-rm -f $(UIMAGE)
 	-rm -f $(ZIMAGE)

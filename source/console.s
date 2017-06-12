@@ -39,11 +39,10 @@ _tty_console:
 	   a valid null terminator and does not excede 4096 bytes and tfr 
 	*/
 	cmp r1, $0x1000
-	movhs r0 $-1
+	movhs r0, $-1
 	bxhs lr					@ return -1 if too many chars
 	
 	stmfd sp!, {lr}
-	ldr r2, =StdOut
 
 	mvnhi r0, $0				@ if string to big return -1
 	bxhi lr
@@ -54,12 +53,12 @@ _tty_console:
 	bl _tty_write
 
 	cmp r0, $0
-	ldmfd sp!, {pc}
 	/* if error (not zero) then print error message if possible */
 	@ bne _tty_error
 	/* if no problems b to _tty_display (display to monitor or uart */
 	ldr r0, =TermInfo
 	bleq _tty_display
+	ldmfd sp!, {pc}
 
 _tty_write:
 	/* Input: R0 &StdOut

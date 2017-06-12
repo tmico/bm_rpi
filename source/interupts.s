@@ -120,9 +120,10 @@ _reset:
 
 	.global _undefined
 _undefined:
-	sub r1, pc, $8				@ Informing via uart what...
-	ldr r0, =Abort				@ ...exception was triggered
-	sub r2, lr, $4
+	ldr r0, =RegContent
+	mrs r1, spsr
+	sub r2, lr, $4				@ when the excepton happend
+	ldr r3, =UndefinedLable
 	bl _kprint
 	mov r0, r1
 	bl _uart_ctr
@@ -141,14 +142,11 @@ _swi:
 	bic r0, r0, $(1<<6)			@ re-enable fiq
 	msr cpsr, r0
 	*/
-	ldr r0, =RegContent
-	mrs r1, spsr
-	sub r2, lr, $4				@ when the excepton happend
-	ldr r3, =SwiLable
-	bl _kprint
-	mov r0, r1
-	bl _uart_ctr
 
+	ldr r4, =SysCall
+	ldr r5, [r4, r7, lsl $2]		@ r7 syscall a la linux
+	blx r5					@ branch to correct call
+	
 	mrs r0, cpsr
 	orr r0, r0, $(1<<7)			@ disable interupts
 	orr r0, r0, $(1<<6)			@ disable fiq
@@ -158,6 +156,14 @@ _swi:
 
 	.global _pre_abort
 _pre_abort:
+	ldr r0, =RegContent
+	mrs r1, spsr
+	sub r2, lr, $4				@ when the excepton happend
+	ldr r3, =PreAbortLable
+	bl _kprint
+	mov r0, r1
+	bl _uart_ctr
+
 	sub r1, pc, $8				@ Informing via uart what...
 	ldr r0, =Abort				@ ...exception was triggered
 	sub r2, lr, $4
@@ -169,20 +175,22 @@ pa:
 
 	.global _data_abort
 _data_abort:
-	sub r1, pc, $8				@ Informing via uart what...
-	ldr r0, =Abort				@ ...exception was triggered
-	sub r2, lr, $4
+da:	
+	ldr r0, =RegContent
+	mrs r1, spsr
+	sub r2, lr, $4				@ when the excepton happend
+	ldr r3, =DataAbortLable
 	bl _kprint
 	mov r0, r1
 	bl _uart_ctr
-da:	
 	b da
 
 	.global _reserved
 _reserved:
-	sub r1, pc, $8				@ Informing via uart what...
-	ldr r0, =Abort				@ ...exception was triggered
-	sub r2, lr, $4
+	ldr r0, =RegContent
+	mrs r1, spsr
+	sub r2, lr, $4				@ when the excepton happend
+	ldr r3, =ReservedLable
 	bl _kprint
 	mov r0, r1
 	bl _uart_ctr
@@ -301,9 +309,47 @@ _arm_timer_interupt:
 	bl _uart_ctr
 	bx r4
 
+/* =========== End of interupt service routines ====== */
+
+/* SVR/SWI Hanlers
+*/
+
+_sys_write:
+	cmp r0, $1				@ fd 1 = StdOut
+	bne _get_fd
+	cmp r2, $0x1000				@ if > than max then...
+	ldrhs r2, =$0x999			@ ...set string length to max
+	
+_get_lock:	
+	ldr r6, =LockStdOut
+	ldrex r3, [r6]
+	mov r4, $1
+	cmp r3, $0
+	strexeq r3, r4, [r6]
+	cmpeq r3, $0
+	bne _get_lock
+	
+	ldrb r5, [r1], $1			@ move string to StdOut buffer
+	ldr r7, =StdOut
+_ms:
+	subs r2, r2, $1
+	strneb r5, [r7], $1
+	ldrneb r5, [r1], $1
+	bne _ms
+	mov r5, $0
+	strb r5, [r7], $1
+	bx lr
+	
+	
+_get_fd:	
+	/*ToDo setup a proper file descriptor table */
+	
 
 .data
 .align 2
+	.global LockStdOut
+LockStdOut:
+	.int 0
 
 LedOnOff:
 	.word	0x0
@@ -311,10 +357,25 @@ A:
 	.asciz "A"
 	
 RegContent:
-	.asciz "\ncpsr: %x\npc_old: %x\nException: %s\nr12: %x\nr11: %x\n 
-r10: %x\nr9: %x\nr8: %x\nr7: %x\nr6: %x\nr5: %x\nr4: %x\nr3: %x\nr2: %x\n 
-r1: %x\nr0: %x\n"
+	.asciz "\ncpsr: %x\npc_old: %x\nException: %s\nr12: %x\nr11: %x\n \
+		r10: %x\nr9: %x\nr8: %x\nr7: %x\nr6: %x\nr5: %x\nr4: %x\nr3: %x\nr2: %x\n \
+		r1: %x\nr0: %x\n"
 SwiLable:
 	.asciz "SRV/SWI"
+PreAbortLable:
+	.asciz "Pre Abort"
+DataAbortLable:
+	.asciz "Data Abort"
+UndefinedLable:
+	.asciz "Undefined"
+ReservedLable:	
+	.asciz "Reserved"
 Abort:
 	.asciz "PC is %x\nlr is %x\n"
+
+
+SysCall:
+	.word 0					@ sys_read
+	.word 0					@ sys_open
+	.word 0 				@ sys_close
+	.word _sys_write			@ sys_write

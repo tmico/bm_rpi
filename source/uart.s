@@ -143,8 +143,8 @@ _uart_ctr:
 	ldrex r2, [r3]
 	cmp r2, $0				@ free?
 	strexeq r2, r1, [r3]			@ Attempt to lock it
-	cmpeq r2, $1				@ 0 = success, 1 = fail
-	beq _uart_ctr
+	cmpeq r2, $0				@ 0 = success, 1 = fail
+	bne _uart_ctr
 
 	stmfd sp!, {r4, r5, lr}
 	ldr r5, =UartInfo
@@ -270,8 +270,8 @@ _uart_r:
 	ldrex r2, [r3]
 	cmp r2, $0				@ free?
 	strexeq r2, r1, [r3]			@ Attempt to lock it
-	cmpeq r2, $1				@ 0 = success, 1 = fail...
-	bne _uart_r					@ ...if not lock and continue
+	cmpeq r2, $0				@ 0 = success, 1 = fail...
+	bne _uart_r				@ ...if not locked continue
 
 	cmp r2, $0
 	mvnne r0, $0
