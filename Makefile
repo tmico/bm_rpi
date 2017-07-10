@@ -18,9 +18,9 @@ BUILD = build/
 SOURCE = source/
 
 # The name of the output files to generate.
-KERNEL = kernel.img
+KERNEL = kimage
 
-KERNELGZ = kernel.img.gz
+KERNELGZ = kimage.gz
 
 UIMAGE = uimage
 
@@ -49,12 +49,12 @@ all: $(KERNEL) $(LIST) $(UIMAGE) $(ZIMAGE)
 rebuild: clean all
 
 # Rule to make the listing file.
-$(LIST): $(BUILD)output.elf
-	$(ARMGNU)-objdump -D $(BUILD)output.elf > $(LIST)
+$(LIST): $(BUILD)kimage.elf
+	$(ARMGNU)-objdump -D $(BUILD)kimage.elf > $(LIST)
 
 # Rule to make the image file.
-$(KERNEL): $(BUILD)output.elf
-	$(ARMGNU)-objcopy $(BUILD)output.elf -O binary $(KERNEL)
+$(KERNEL): $(BUILD)kimage.elf
+	$(ARMGNU)-objcopy $(BUILD)kimage.elf -O binary $(KERNEL)
 
 # Rule to make gzip'ed image
 $(KERNELGZ): $(KERNEL)
@@ -62,15 +62,15 @@ $(KERNELGZ): $(KERNEL)
 
 $(UIMAGE): $(KERNEL)
 	@ echo "Invoking mkimage to make an uncompressed image"
-	mkimage -A arm -T kernel -C none -a 0x8000 -e 0x8000 -n "virus-0.0" -d kernel.img  $(UIMAGE)
+	mkimage -A arm -T kernel -C none -a 0x8000 -e 0x8000 -n "virus-0.0" -d $(KERNEL)  $(UIMAGE)
 
 $(ZIMAGE): $(KERNELGZ)
 	@ echo "Invoking mkimage to make an compressed image"
-	mkimage -A arm -T kernel -C gzip -a 0x8000 -e 0x8000 -n "virus-0.0" -d kernel.img.gz $(ZIMAGE)
+	mkimage -A arm -T kernel -C gzip -a 0x8000 -e 0x8000 -n "virus-0.0" -d $(KERNELGZ) $(ZIMAGE)
 
 # Rule to make the elf file.
-$(BUILD)output.elf: $(OBJECTS)
-	$(ARMGNU)-ld --no-undefined $(OBJECTS) -Map $(MAP) -o $(BUILD)output.elf -T $(LINKER)
+$(BUILD)kimage.elf: $(OBJECTS)
+	$(ARMGNU)-ld --no-undefined $(OBJECTS) -Map $(MAP) -o $(BUILD)kimage.elf -T $(LINKER)
 
 # Rule to make gdb friendly file.
 $(GDBELF): $(OBJECTS_GDB)

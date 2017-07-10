@@ -2,7 +2,9 @@
 *.~
 *~
 *.patch
+*.gz
 kernel.*
+kimage
 zimage
 uimage
 build/

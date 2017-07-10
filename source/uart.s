@@ -176,7 +176,11 @@ _ctr:
 	ldr r3, =UartLck			@ unlock
 	mov r1, $0
 	str r1, [r3]			
-	DMB					@ ensure memory is clean
+	/*DMB	--trigers an undfined excption in armv6 so need to use p15
+	 (see pg 217 of arm1176ijf-s) */
+	mcr p15, 0, r1, c7, c10, 5 		@ DMB
+
+	
 
 	ldmfd sp!, {r4, r5, pc}
 UartLck:
@@ -316,7 +320,9 @@ _u_gets:
 	strb r0, [r12]
 	ldr r3, =UartLck
 	str r0, [r3]
-	DMB					@ unlock mutex
+	/*DMB	--trigers an undfined excption in armv6 so need to use p15
+	 (see pg 217 of arm1176ijf-s) */
+	mcr p15, 0, r1, c7, c10, 5 		@ Perform DMB ...
 
 	mov r0, $0xf9000
 	ldmfd sp!, {pc}				@ return

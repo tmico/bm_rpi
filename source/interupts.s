@@ -1,24 +1,6 @@
 	.section .interupts
 	.align 2
-/*
-	Instruction table to load into memory 0x00
-	The kernel is loaded to mem loc 0x8000. The arm system jumps to these
-	addresses when there is an exception:
-	0x00 : reset
-	0x04 : undifined instruction
-	0x08 : software interupt (svr)
-	0x0c : pre abort
-	0x10 : data abort
-	0x14 : reserverd
-	0x18 : IRQ
-	0x1c : FIQ
-	The insruction table is used to put the correct branch instructions 
-	(ie, if there is an interupt, the intruction at 0x18 will be
-	[b <_interupt_handler_lable>] or [ldr pc, =_irq_interupt])
-	into the correct memory location
-*/
 /* Bellow are the handlers for each exception, obviously unfinshed!!!*/
-
 
 	.global _reset
 _reset:
@@ -26,51 +8,6 @@ _reset:
 	/* Ensure we are in supervisor mode */
 	mov r0, $0x13
 	msr cpsr_c, r0
-
-	/* Populate vector table with [b <exception_lable>]. the exception
-	 * lable is calculated by finding its absolute address minus 8 (b is same
-	 * as [add pc, pc, addr]) minus address in mem of its location (eg for
-	 * irq, its address location is 0x18) and then finally right shifted 2
-	 * places
-	 */
-	ldr r4, =_reset
-	ldr r5, =_undefined
-	ldr r6, =_swi
-	ldr r8, =_pre_abort
-	ldr r9, =_data_abort
-	ldr r10, =_irq_interupt
-	ldr r11, =_fiq_interupt
-	mov r0, $0x00
-	mov r1, $0xea000000			@ op code for b[ranch]
-
-	sub r4, r4, $0x08			@ need to adjust for relative
-	sub r5, r5, $0x0b			@  offset. 
-	sub r6, r6, $0x10
-	sub r7, r7, $0x14
-	sub r8, r8, $0x18
-	sub r9, r9, $0x1b
-	sub r10, r10, $0x20
-	sub r11, r11, $0x24
-
-	mov r4, r4, lsr $2			@ the offset is right shiffted
-	mov r5, r5, lsr $2			@  as an operand two places
-	mov r6, r6, lsr $2
-	mov r7, r7, lsr $2
-	mov r8, r8, lsr $2
-	mov r9, r9, lsr $2
-	mov r10, r10, lsr $2
-	mov r11, r11, lsr $2
-
-	orr r4, r4, r1				@ Put addr and b together
-	orr r5, r5, r1
-	orr r6, r6, r1
-	orr r7, r7, r1
-	orr r8, r8, r1
-	orr r9, r9, r1
-	orr r10, r10, r1
-	orr r11, r11, r1
-
-	stmia r0, {r4 - r11}			@ write a vector table
 
 	/* Set up the stack pointers for different cpu modes */
 	mov r0, $0x11			@ Enter FIQ mode
@@ -94,8 +31,6 @@ _reset:
 	msr cpsr, r0
 	mov sp, $0x4000			@ set its stack pointer
 
-	/* inititalize peripheral hardware such as uart, gpu framebuffer, 
-	 * timer etc */
 	bl _boot_seq
 
 	mov r0, $0x17			@ Enter ABORT mode
@@ -115,6 +50,9 @@ _reset:
 	mov r0, $0x10
 	msr cpsr, r0			@ User mode | fiq/irq enabled
 	mov sp, $0x8000
+
+	/* inititalize peripheral hardware such as uart, gpu framebuffer, 
+	 * timer etc */
 
 	b _start
 
@@ -152,7 +90,7 @@ _swi:
 	orr r0, r0, $(1<<6)			@ disable fiq
 	msr cpsr, r0
 	str r2, [r0]				@ clear lock
-	ldmfd sp!, {r0-r12, pc}^		@ return from svr/swi
+ldmfd sp!, {r0-r12, pc}^		@ return from svr/swi
 
 	.global _pre_abort
 _pre_abort:
@@ -311,39 +249,8 @@ _arm_timer_interupt:
 
 /* =========== End of interupt service routines ====== */
 
-/* SVR/SWI Hanlers
+/* SVR/SWI Handlers
 */
-
-_sys_write:
-	cmp r0, $1				@ fd 1 = StdOut
-	bne _get_fd
-	cmp r2, $0x1000				@ if > than max then...
-	ldrhs r2, =$0x999			@ ...set string length to max
-	
-_get_lock:	
-	ldr r6, =LockStdOut
-	ldrex r3, [r6]
-	mov r4, $1
-	cmp r3, $0
-	strexeq r3, r4, [r6]
-	cmpeq r3, $0
-	bne _get_lock
-	
-	ldrb r5, [r1], $1			@ move string to StdOut buffer
-	ldr r7, =StdOut
-_ms:
-	subs r2, r2, $1
-	strneb r5, [r7], $1
-	ldrneb r5, [r1], $1
-	bne _ms
-	mov r5, $0
-	strb r5, [r7], $1
-	bx lr
-	
-	
-_get_fd:	
-	/*ToDo setup a proper file descriptor table */
-	
 
 .data
 .align 2
@@ -357,9 +264,9 @@ A:
 	.asciz "A"
 	
 RegContent:
-	.asciz "\ncpsr: %x\npc_old: %x\nException: %s\nr12: %x\nr11: %x\n \
-		r10: %x\nr9: %x\nr8: %x\nr7: %x\nr6: %x\nr5: %x\nr4: %x\nr3: %x\nr2: %x\n \
-		r1: %x\nr0: %x\n"
+	.ascii "\ncpsr: %x\npc_old: %x\nException: %s\nr12: %x\nr11: %x"
+	.ascii "\nr10: %x\nr9: %x\nr8: %x\nr7: %x\nr6: %x\nr5: %x\nr4: %x\nr3: %x\nr2: %x"
+	.asciz "\nr1: %x\nr0: %x\n"
 SwiLable:
 	.asciz "SRV/SWI"
 PreAbortLable:
@@ -379,3 +286,4 @@ SysCall:
 	.word 0					@ sys_open
 	.word 0 				@ sys_close
 	.word _sys_write			@ sys_write
+
