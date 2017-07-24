@@ -5,6 +5,8 @@
 	.align 2
 
 	.global _sys_write
+	/* Input: r0 = fd, r1 = &STRING, r2 = SIZE (bytes (inc NULL byte))
+	 */
 _sys_write:
 	cmp r0, $1				@ fd 1 = StdOut
 	mov r11, lr				@ preserve lr
@@ -37,5 +39,19 @@ _ms:
 _get_fd:	
 	/*ToDo setup a proper file descriptor table */
 	bx lr					@ FD not implimented yet so return...
-						@ ...safly
+						@ ...safely
+	.data
+	.align 2
+	
+	.global LockStdOut
+LockStdOut:					@ mutex for StdOut
+	.int 0
 
+	/* jump/switch table for syscalls */
+	.global SysCall
+SysCall:
+	
+	 .word 0                                 @ sys_read
+	 .word 0                                 @ sys_open
+	 .word 0                                 @ sys_close
+	 .word _sys_write                        @ sys_write

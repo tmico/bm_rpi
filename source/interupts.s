@@ -254,9 +254,6 @@ _arm_timer_interupt:
 
 .data
 .align 2
-	.global LockStdOut
-LockStdOut:
-	.int 0
 
 LedOnOff:
 	.word	0x0
@@ -281,9 +278,9 @@ Abort:
 	.asciz "PC is %x\nlr is %x\n"
 
 
-SysCall:
-	.word 0					@ sys_read
-	.word 0					@ sys_open
-	.word 0 				@ sys_close
-	.word _sys_write			@ sys_write
+
+
+
+
+
 

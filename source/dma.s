@@ -147,6 +147,12 @@ _clrl_dma0:
 	.data
 	.align 5
 
+	/* The Control Block to do a dma transfer has some preset values but others
+	   will need to be calculated at run time such as the gpu mem addr 
+	   pointing to correct line to blank out. 
+	   (TXFR = (hi hw = 16 (y)) (lo hw = 0xa00 (4 (bytes) * 8 (pixels) * 80 (char))
+	   (d_stride = 0x1400 (1280 pixels) - 0xa00 (80 char), s_stride = 0)
+	*/
 	.global CB_ClearLine
 CB_ClearLine:			@ Control Block with some preset values
 	.word	0x23a		@ TI

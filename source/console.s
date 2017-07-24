@@ -440,12 +440,16 @@ StdOut:
 	.byte 0x02
 	.endr
 
-	/* The Control Block to do a dma transfer has some preset values but others
-	   will need to be calculated at run time such as the gpu mem addr 
-	   pointing to correct line to blank out. 
-	   (TXFR = (hi hw = 16 (y)) (lo hw = 0xa00 (4 (bytes) * 8 (pixels) * 80 (char))
-	   (d_stride = 0x1400 (1280 pixels) - 0xa00 (80 char), s_stride = 0)
-	*/
+Console_fifo:			@ A fifo holding start addresses of strings
+	.word 0			@ lock
+	.word 0			@ head
+	.word 0			@ tail
+	.word 64		@ size in bytes
+	.rept 16		
+	.word 0			@ fifo buffer
+	.endr
+	
+
 	.align 8
 TermBuffer:
 	.rept 128 * 128

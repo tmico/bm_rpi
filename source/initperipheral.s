@@ -1,4 +1,4 @@
-	/* initialize all the peripherals that system will need. */
+/* initialize all the peripherals that system will need. */
 
 	.text
 	.align 2
