@@ -1,8 +1,16 @@
 	.section .init				@ initialize this section first
 	b _reset
+@ =============================================
+@ End of section init 
+@ Section main
+@ =============================================
 
-/* ========= End of section init ========= */
-
+.ifdef __linux__
+.equ NUM, -1
+.else
+.equ NUM, 1
+.endif
+	mov r1, #NUM
 	.section .main
 
 	.global _start
@@ -29,8 +37,10 @@ _L1:
 
 	bl _display_pic
 	
-/*****************************************************************************/
-/************** Testing *** Code *****************/
+@==============================================
+@ Testing Code 
+@==============================================
+
 @testing transfer speeds between dma & cpu
 	@bl _test_speeds
 @	nop

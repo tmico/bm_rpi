@@ -8,8 +8,7 @@
 	
 	.global _fenqueue
 _fenqueue:
-	/* 
-	 * Input r0 = fifo address to append data to
+	/* Input r0 = fifo address to append data to
 	 *	 r1 = int value
 	 *
 	 * structer of fifo queue:
