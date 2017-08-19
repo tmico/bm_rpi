@@ -5,6 +5,11 @@
 	.global _reset
 _reset:
 
+	.if DEBUG == 1				@ If debug sym is set then we
+	bl _boot_seq				@ ...need to skip seting up the
+						@ ...various exception modes
+						@ ...to allow gdb debugging
+	.else
 	/* Ensure we are in supervisor mode */
 	mov r0, $0x13
 	msr cpsr_c, r0
@@ -31,6 +36,8 @@ _reset:
 	msr cpsr, r0
 	mov sp, $0x4000			@ set its stack pointer
 
+	/* inititalize peripheral hardware such as uart, gpu framebuffer, 
+	 * timer etc while in supervisor mode */
 	bl _boot_seq
 
 	mov r0, $0x17			@ Enter ABORT mode
@@ -51,9 +58,7 @@ _reset:
 	msr cpsr, r0			@ User mode | fiq/irq enabled
 	mov sp, $0x8000
 
-	/* inititalize peripheral hardware such as uart, gpu framebuffer, 
-	 * timer etc */
-
+	.endif
 	b _start
 
 	.global _undefined
