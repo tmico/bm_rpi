@@ -5,12 +5,6 @@
 @ Section main
 @ =============================================
 
-.ifdef __linux__
-.equ NUM, -1
-.else
-.equ NUM, 1
-.endif
-	mov r1, #NUM
 	.section .main
 
 	.global _start

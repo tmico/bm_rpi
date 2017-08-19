@@ -7,6 +7,9 @@
 	.global _sys_write
 	/* Input: r0 = fd, r1 = &STRING, r2 = SIZE (bytes (inc NULL byte))
 	 */
+@@@ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@ re-do to use fqueue to put sting in a fifo buffer.
+@@@ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 _sys_write:
 	cmp r0, $1				@ fd 1 = StdOut
 	mov r11, lr				@ preserve lr

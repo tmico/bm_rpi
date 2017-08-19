@@ -3,15 +3,21 @@
 #	A makefile script for generation of raspberry pi kernel images.
 #
 ###############################################################################
+DEBUG =
 
 # ===========================================================
-# The compiler to use and flags 
+# The compiler and flags to use set depending on debug option
 # ===========================================================
-ARMGNU ?= arm-none-eabi
+CROSS_TOOLS ?= arm-none-eabi-
+HOST_TOOLS =
 
-# ASFLAGS for debugging
-ASFLAGS = -g
-
+ifeq ($(DEBUG),yes)
+	ARMGNU = $(HOST_TOOLS)
+	ASFLAGS = -g --defsym DEBUG=1
+else
+	ARMGNU = $(CROSS_TOOLS)
+	ASFLAGS = -g
+endif
 
 # ===========================================================
 # The directories for source and compiled object files.
@@ -26,7 +32,16 @@ SOURCE = source/
 # ===========================================================
 # The name of the output files to generate.
 # ===========================================================
-KERNEL = kimage
+KERNELDBG = kernelgdb.elf
+KERNEL = kimage.elf
+
+ifeq ($(DEBUG),yes)
+	IMAGE_ELF = $(KERNELDBG)
+else
+	IMAGE_ELF = $(KERNEL)
+endif
+
+IMAGE = kimage
 
 KERNELGZ = kimage.gz
 
@@ -38,7 +53,7 @@ LIST = kernel.list
 
 MAP = kernel.map
 
-GDBELF = kgdb.elf
+GDBMAP = kernelgdb.map
 
 LINKER = kernel.ld
 
@@ -46,62 +61,50 @@ LINKER = kernel.ld
 # ===========================================================
 # Rules to make object files deduced from source files and
 # build kernel 
+# If DEBUG=yes is passed to make, a gdb usable (but not 
+#  perfect) kernelgdb.elf image is built
 # ===========================================================
 OBJECTS := $(patsubst $(SOURCE)%.s,$(BUILD)%.o,$(wildcard $(SOURCE)*.s))
 
-# Rule to make everything.
-all: $(KERNEL) $(LIST) $(UIMAGE) $(ZIMAGE)
+all: $(IMAGE) $(LIST) $(UIMAGE) $(ZIMAGE) 
 
 rebuild: clean all
 
-$(LIST): $(BUILD)kimage.elf
-	$(ARMGNU)-objdump -D $(BUILD)kimage.elf > $(LIST)
+$(LIST): $(BUILD)$(IMAGE_ELF)
+	$(ARMGNU)objdump -D $(BUILD)$(IMAGE_ELF) > $(LIST)
 
-$(KERNEL): $(BUILD)kimage.elf
-	$(ARMGNU)-objcopy --strip-debug $(BUILD)kimage.elf -O binary $(KERNEL)
 
-$(BUILD)kimage.elf: $(OBJECTS)
-	$(ARMGNU)-ld --no-undefined $(OBJECTS) -Map $(MAP) -o $(BUILD)kimage.elf -T $(LINKER)
+$(IMAGE): $(BUILD)$(IMAGE_ELF)
+	$(ARMGNU)objcopy --strip-debug $(BUILD)$(IMAGE_ELF) -O binary $(IMAGE)
+
+
+$(BUILD)$(IMAGE_ELF): $(OBJECTS)
+	$(ARMGNU)ld --no-undefined $(OBJECTS) -Map $(MAP) -T $(LINKER) -o $(BUILD)$(IMAGE_ELF) 
+
 
 $(BUILD)%.o: $(SOURCE)%.s $(BUILD)
-	$(ARMGNU)-as $(ASFLAGS) -I $(SOURCE) $< -o $@
+	$(ARMGNU)as $(ASFLAGS) -I $(SOURCE) $< -o $@
 
 
 # ===========================================================
 # Rule to make gzip'ed and u-boot bootable image files
 # ===========================================================
-$(KERNELGZ): $(KERNEL)
-	gzip -k -f $(KERNEL)
+$(KERNELGZ): $(IMAGE)
+ifneq ($(DEBUG),yes)
+	gzip -k -f $(IMAGE)
+endif
 
-$(UIMAGE): $(KERNEL)
+$(UIMAGE): $(IMAGE)
+ifneq ($(DEBUG),yes)
 	@ echo "Invoking mkimage to make an uncompressed image"
-	mkimage -A arm -T kernel -C none -a 0x8000 -e 0x8000 -n "virus-0.0" -d $(KERNEL)  $(UIMAGE)
+	mkimage -A arm -T kernel -C none -a 0x8000 -e 0x8000 -n "virus-0.0" -d $(IMAGE)  $(UIMAGE)
+endif
 
 $(ZIMAGE): $(KERNELGZ)
+ifneq ($(DEBUG),yes)
 	@ echo "Invoking mkimage to make an compressed image"
 	mkimage -A arm -T kernel -C gzip -a 0x8000 -e 0x8000 -n "virus-0.0" -d $(KERNELGZ) $(ZIMAGE)
-
-
-# ============================================================
-# Rules to create kgdb.elf. 
-# NOTE: This WILL FAIL if not run on arm host`
-# ============================================================
-OBJ := $(patsubst $(SOURCE)%.s,$(BUILD_GDB)%.o,$(wildcard $(SOURCE)*.s))
-
-debug: $(GDBELF) note
-
-$(BUILD_GDB)%.o: $(SOURCE)%.s $(BUILD_GDB) note
-	as $(ASFLAGS) -I $(SOURCE) $< -o $@
-	@echo $(note)
-
-$(GDBELF): $(OBJ)
-	ld --no-undefined $(OBJ) -o $(GDBELF) 
-	objdump -D $(GDBELF) > $(GDBELF).list
-
-note:
-	@ echo "********************************************************"
-	@ echo "The debug rule can only work if compiling on an arm host"
-	@ echo "********************************************************"
+endif
 
 #============================================================
 # Rules to make directories and what to delete when cleaning
@@ -124,3 +127,7 @@ clean:
 	-rm -f $(ZIMAGE)
 	-rm -f $(GDBELF)
 	-rm -f $(GDBELF).list
+
+#	@ echo "**********************************************************"
+#	@ echo "* The DEBUG=yes can only work if compiling on an arm host"
+#	@ echo "**********************************************************"

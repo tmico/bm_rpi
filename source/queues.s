@@ -1,7 +1,7 @@
 /* Functions to operate on queues.
  *  squeue operates on singly linked queues
  *  dqueue operates on doubly linked queues
- *  fqueue operates on fifo circular buffer queue [Has to be multiples of 4bytes]
+ *  fqueue operates on fifo circular buffer queue 
  *  strqueue operates on a string fifo
 */
 
@@ -50,7 +50,8 @@ _entail:
 	moveq r0, $-1
 	b _exit
 
-	.global fdequeue
+
+	.global _fdequeue
 _fdequeue:
 	/* Input: r0 = fifo addr (base struct to which fifo buffer belongs)
 	 *
@@ -82,8 +83,8 @@ _get_loc:
 	mov r12, $1				@ to set up a mutex on fifo
 	ldrex r3, [r0]				@ get size and use as lock
 	cmp r3, $0				@ valid size or locked?
-	strexeq r2, r12, [r0]			@ lock if valid size there
-	cmp r2, $0
+	strexeq r3, r12, [r0]			@ lock if valid size there
+	cmp r3, $0
 	bxeq lr
 	b _get_loc
 
@@ -95,3 +96,33 @@ _exit:
 	str r3, [r12]				@ release lock
 	mcr p15, 0, r3, c7, c10, 5		@ DMB
 	ldmfd sp!, {r4, r5, pc}
+
+
+	.global _strqueue
+_strqueue:	
+	/* Input r0 = fifo address to append data to
+	 *	 r1 = char value
+	 *	 r2 = n.o char
+	 *
+	 * structer of fifo queue:
+	 *	.int lock
+	 *	.int pointer to head
+	 *	.int pointer to tail (points to nxt available slot
+	 *	.int size (bytes) of buffer array. 
+	 *	.byte x size buffer
+	 */
+	stmfd sp!, {r4 - r5, lr}
+	bl _get_loc
+
+	mov r12, r0				@ preserve addr
+	ldr r4, [r0, $4]
+	ldr r5, [r0. $8]			@ ldr head and tail
+	ldr r3, [r0, $12]!			@ ldr buffer size
+	cmp r4, $0				@ if empty then ...
+	bne _sentail
+_senhead:
+	
+	
+
+	
+	
