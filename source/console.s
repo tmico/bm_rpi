@@ -31,23 +31,12 @@
 	   buffer. The buffer is reset when Base address is started from
 	*/
 _tty_console:
-	/* INPUT r0 pointer to current char (byte) address 
-		 r1 no. chars to print exl null
-		 r2 append to StdOut or new string. 0 = start, 1 = appened
-	   
-	   Before loading reg and branching to _tty_write test string holds
-	   a valid null terminator and does not excede 4096 bytes and tfr 
+	/* INPUT  none
 	*/
-	cmp r1, $0x1000
-	movhs r0, $-1
-	bxhs lr					@ return -1 if too many chars
-	
 	stmfd sp!, {lr}
 
-	mvnhi r0, $0				@ if string to big return -1
-	bxhi lr
-	
-	push {lr}
+	ldr r0, =StdOut
+	bl _get_loc
 	ldr r1, =TermInfo
 
 	bl _tty_write
@@ -436,10 +425,15 @@ StdIn:
 
 	.global StdOut
 StdOut:
-	.rept 0x1000
-	.byte 0x02
+	.int 0			@ lock
+	.int 0			@ head
+	.int 0			@ tail
+	.int 0x2000		@ size (bytes)
+	.rept 0x2000
+	.byte 0x0		@ fifo
 	.endr
 
+/*
 Console_fifo:			@ A fifo holding start addresses of strings
 	.word 0			@ lock
 	.word 0			@ head
@@ -448,7 +442,7 @@ Console_fifo:			@ A fifo holding start addresses of strings
 	.rept 16		
 	.word 0			@ fifo buffer
 	.endr
-	
+*/	
 
 	.align 8
 TermBuffer:
