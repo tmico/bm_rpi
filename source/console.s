@@ -417,12 +417,6 @@ BlankLine:			@ Empty blank line to clear 8 pixiles in a row
 	.byte 0x0		@ black
 	.endr
 
-	.global StdIn
-StdIn:
-	.rept 0x1000
-	.byte 0x02
-	.endr
-
 	.global StdOut
 StdOut:
 	.int 0			@ lock
