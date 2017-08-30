@@ -16,7 +16,6 @@ _fenqueue:
 	 *	.int pointer to head
 	 *	.int pointer to tail (points to nxt available slot
 	 *	.int fifo size (bytes) of buffer array. 
-	 *	.int value size (Val_Size)
 	 *	.byte x size buffer
 	 */
 	
@@ -27,7 +26,6 @@ _fenqueue:
 	ldr r4, [r12], $4			@ get head
 	ldr r5, [r12], $4			@ get tail
 	ldr r3, [r12], $4			@ get size of buffer
-@--	ldr r6, [r12], $4			@ get Val_Size
 	cmp r4, r5				@ Is fifo full
 	beq _queue_full
 	cmp r4, $0				@ is fifo empty...

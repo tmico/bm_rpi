@@ -375,3 +375,4 @@ UartTxBuffer:
 	.rept 0x80				@ 128 byte buffer
 	.byte 0
 	.endr
+StdIn:	@-- Temp here to allow compiling. One of many things to sort out!!! patience :)

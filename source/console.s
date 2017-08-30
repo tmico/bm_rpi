@@ -1,60 +1,104 @@
 	/* rewriting _write_tbf function */
 
-	.global _tty_console
+	.global _tty_console_in
 	.align 2
 
 	.text
-	/* _tty_console : Sends StdOut to _tty_write to be put on the
-	   the TermBuffer. _tty_write returns to _tty_console a $0 or $-1.
-	   0 = success, -1 = failed. 
-		if 0 then branch to _display_tty to refresh terminal display
-		if -1 then bx lr with error
-	   _tty_write : writes char's within string to TermBuffer
-	   r0 input string (StdOut)
-	   r1 address of TermInfo data array
-	   Returns:
-	   r0 output , 0 success, -1 error
-		TermBuffer0 is aligned 8 
+
+TtyLock:
+	.word 0
+_tty_console_in: 				@-- change to better named label!
+	/* Takes a string (r0 = string addr) and puts it in ConsoleFifo queue
+	   INPUT  r0 = string addr 
+		  r1 = size (inc null char)
 	*/
-	/* _tty_write converts string buffer given to it via r0 as a byte
-	   per char into 2bytes per char by inserting in the high bits 
-	   (15:8) 16 colour code for background (high nibble) and font (low
-	   nibble) 
-	/* Charactor editing (such as deleting) for the console only 
-	   works for the current string. Pressing the backspace key for
-	   will only delete char found in kb_input buffer. Obviously
-	   a user typing will want to see the keys pressed echo'd back
-	   on screen and as such the kb_buffer has to be kept 'open' even
-	   as display_tty function updates the screen. The kb_buffer
-	   is reset when the return\enter is pressed. Responsibility
-	   then is passed to whichever function is putting char's in the
-	   buffer. The buffer is reset when Base address is started from
+	ldr r3, =TtyLock			@ Need a lock to prevent
+	mov r12, $1				@ ...a 0x2000 char string
+	ldrex r2, [r3]				@ ...from being split apart
+	cmp r2, $0
+	strexeq r2, r12, [r3]
+	cmp r2, $0
+	bne _tty_console_in
+	
+	stmfd sp!, {r4 - r7, lr}
+	mov r4, r0
+	mov r5, r1				@ preserve
+_get_free_buffer:	
+	ldr r0, =FreeBufList
+	bl _fdequeue
+	cmp r0, $0				@ zero in this case is failed...
+	beq _get_free_buffer			@ ...to get a free buffer 
+	mov r7, r0				@ preserv addr
+
+	/* Use strcpy to copy string to given Out buffer. If string longer
+	   than Max then request next free buffer(s) to copy remainder of
+	   string to
 	*/
-_tty_console:
-	/* INPUT  none
+	mov r2, $0x2000
+	sub r2, r2, $1				@ sub 1 to allow null byte
+	subs r5, r5, r2
+	addmi r2, r2, r5
+	add r6, r2, $1
+	mov r1, r4
+	addpl r4, r4, r2 
+	bl _strcpy				@ transfer string to buffer
+
+	mov r1, $0				@ add a null pointer ...
+	strb r1, [r0, r6] 			@ ...to be safe
+
+_put_in_ConsoleFifo:	
+	ldr r0, =ConsoleFifo
+	mov r1, r7
+	bl _fenqueue
+	cmp r0, $0
+	bne _put_in_ConsoleFifo
+	
+
+	cmp r5, $0				@ string completly copied?
+	bgt _get_free_buffer
+
+	ldr r3, =TtyLock
+	mov r2, $0
+	str r2, [r3]
+	mcr p15, 0, r2, c7, c10, 5		@ DMB
+	ldmfd sp!, {r4 - r7, pc}
+
+@===============================================================================
+
+_tty_console_out:	
+	/* Fetches from ConsoleFifo the next string to be printed to
+		the console.
+	   pass address to _tty_write to put string in consoles buffer
+	   _tty_display displays to console the contents of consoles buffer
 	*/
 	stmfd sp!, {lr}
+_tco:	
+	ldr r0, =ConsoleFifo
+	bl _fdequeue
+	cmp r0, $0				@ have we got an address?
+	bne _tco
 
-	ldr r0, =StdOut
-	bl _get_loc
 	ldr r1, =TermInfo
-
 	bl _tty_write
 
 	cmp r0, $0
-	/* if error (not zero) then print error message if possible */
-	@ bne _tty_error
-	/* if no problems b to _tty_display (display to monitor or uart */
+
 	ldr r0, =TermInfo
 	bleq _tty_display
 	ldmfd sp!, {pc}
 
+@===============================================================================
+
 _tty_write:
-	/* Input: R0 &StdOut
+	/* _tty_write converts string buffer given to it via r0 as a byte
+	   per char into 2bytes per char by inserting in the high bits 
+	   (15:8) 16 colour code for background (high nibble) and font (low
+	   nibble) 
+	   Input: R0 &StdOut
 		  R1 &TermInfo
 	*/
 	stmfd sp!, {r4,r5,r6,r10,r11}
-	ldr r5, [r1, $8]			@ get address of TermCur (current line)
+	ldr r5, [r1, $8]			@ get address of TermCur...
 	ldr r4, [r1, $28]			@ get n.o char per line to use
 	ldr r11, [r1]				@ get Termbuffer address
 	ldr r12, [r1, $16]			@ get TermColour
@@ -417,32 +461,60 @@ BlankLine:			@ Empty blank line to clear 8 pixiles in a row
 	.byte 0x0		@ black
 	.endr
 
-	.global StdIn
-StdIn:
-	.rept 0x1000
-	.byte 0x02
-	.endr
-
-	.global StdOut
-StdOut:
-	.int 0			@ lock
-	.int 0			@ head
-	.int 0			@ tail
-	.int 0x2000		@ size (bytes)
+FreeBufList:
+	.word 0 			@ lock
+	.word FreeBufList + 16		@ Head
+	.word FreeBufList + 44		@ Tail
+	.word 32			@ Size (bytes)
+	.word Out0
+	.word Out1
+	.word Out2
+	.word Out3
+	.word Out4
+	.word Out5
+	.word Out6
+	.word Out7
+Out0:
 	.rept 0x2000
-	.byte 0x0		@ fifo
+	.byte 0x0		@ Buffer 0
+	.endr
+Out1:
+	.rept 0x2000
+	.byte 0x0		@ Buffer 1
+	.endr
+Out2:
+	.rept 0x2000
+	.byte 0x0		@ Buffer 2
+	.endr
+Out3:
+	.rept 0x2000
+	.byte 0x0		@ Buffer 3
+	.endr
+Out4:
+	.rept 0x2000
+	.byte 0x0		@ Buffer 4
+	.endr
+Out5:
+	.rept 0x2000
+	.byte 0x0		@ Buffer 5
+	.endr
+Out6:
+	.rept 0x2000
+	.byte 0x0		@ Buffer 6
+	.endr
+Out7:
+	.rept 0x2000
+	.byte 0x0		@ Buffer 7
 	.endr
 
-/*
-Console_fifo:			@ A fifo holding start addresses of strings
+ConsoleFifo:			@ A fifo holding start addresses of strings
 	.word 0			@ lock
 	.word 0			@ head
 	.word 0			@ tail
-	.word 64		@ size in bytes
-	.rept 16		
+	.word 32		@ size in bytes
+	.rept 8		
 	.word 0			@ fifo buffer
 	.endr
-*/	
 
 	.align 8
 TermBuffer:
