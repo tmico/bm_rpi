@@ -40,11 +40,14 @@ _reset_head:
 	cmp r12, $0			@ test if any > children
 	str r3, [r0]			@ null < branch
 	str r0, [r2, $4]		@ save new head
-	blne _rotate_left		@ if r1(child)!=0 ; need to rotate left
+	blne _rotate_head		@ if r1(child)!=0 ; need to rotate left
 	ldmfd sp!, {pc}
 	
-_rotate_left:
-	/* r0 = pivot point*/
+_rotate_head:
+	/* r0 = pivot point
+	 * As head should always be the lowest key then only a left rotate is
+	 * needed, and branches rearanged to relocate head to lowest leaf
+	 */
 	.equ gtrchild, 4
 	.equ parent, 8
 	stmfd sp!, {r4 - r5}
@@ -67,7 +70,7 @@ _find_lsr_leaf:
 	bx lr
 
 _swap_btree:
-	/* swap current and next list round */
+	/* swap <current> and <next> list round */
 	ldr r12, =hb_cur_list
 	ldrd r0, r1, [r12]
 	str r0, [r12, $4]
@@ -80,7 +83,28 @@ _graft_new_fruit:
 	 * new root. Old_root becomes <lesser than child> of new_root
 	 * The <lesser than branch> of the new_root is 'dettached' and
 	 * and moved to become the new <greater than branch> of the old_root
+	 * Input: R0 = Pid addr
+	 *	  R1 = hb_list{x}
 	 */
+	stmfd sp!, {r4 - rx, lr}
+	mov r4, r0
+	mov r5, r1
+	bl get_entry			@ get a mem loc on hb_list
+	ldr r6, [r0, $4]		@ get PV
+	ldr r3, [r1]			@ get root
+	ldr r1, [r3, $16]		@ get key
+	ldrd r2, r3, [r3]		@ get children
+fl:					@ find leaf
+	cmp r1, r6
+	movmi r3, r2
+	cmp r3, $0			@ leaf?
+	ldrne r1, [r3, $16]		@ get key
+	ldrdne r2, r3, [r3]		@ get children
+	bne_fl
+@@@ --- TODO
+@@@ --- Create a address avalable in tree. A fifo queue
+	
+
 
 	.data
 	.align 2
@@ -97,12 +121,6 @@ P_entry:
 		.rept 32
 	.asciz "\0"		@ PNAME --process name
 		.endr
-
-	.align 3	@ align 3 to allow ldrd/strd
-hb_cur_list:		@ current process list to 'pick' from
-	.word	hb_list0
-hb_next_list:		@ next list to 'graft' in
-	.word	hb_list1
 
 	.align 3	@ align 3 to allow ldrd/strd
 hb_list0:
@@ -128,3 +146,9 @@ hb_list1:
 	.word 0		@ KEY == PV
 	.word 0		@ 
 		.endr
+
+	.align 3	@ align 3 to allow ldrd/strd
+hb_cur_list:		@ current process list to 'pick' from
+	.word	hb_list0
+hb_next_list:		@ next list to 'graft' in
+	.word	hb_list1
