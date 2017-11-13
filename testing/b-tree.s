@@ -15,7 +15,7 @@ _pick_tree:
 	ldr r3, [r12]
 	ldrd r6, r7, [r3]		@ get head, root
 	ldrd r4, r5, [r6, $8] 		@ r4 = parent, r5 = pid 
-	cmp r6, r7
+	cmp r6, r7			@ head == root?
 	beq _sw
 	mov r0, r4
 	bl _reset_head
@@ -24,6 +24,9 @@ _q:
 	ldmfd sp!, {r4 -r7, pc}
 
 _sw:
+	mov r0, $0
+	mov r1, r0
+	strd r0, r1, [r3]		@ zero out head and tail
 	bl _swap_btree
 	b _q
 
@@ -87,24 +90,38 @@ _graft_new_fruit:
 	 *	  R1 = hb_list{x}
 	 */
 	stmfd sp!, {r4 - rx, lr}
+	ldr r3, [r1]			@ get root
 	mov r4, r0
 	mov r5, r1
-	bl get_entry			@ get a mem loc on hb_list
+	cmp r3, $0			@ fresh hb_list?
+	beq _set_root
 	ldr r6, [r0, $4]		@ get PV
-	ldr r3, [r1]			@ get root
-	ldr r1, [r3, $16]		@ get key
+	ldr r1, [r3, $16]		@ get roots key
 	ldrd r2, r3, [r3]		@ get children
+	mov r12, r1			@ copy roots key to cmp later
 fl:					@ find leaf
 	cmp r1, r6
 	movmi r3, r2
+	mov r0, r3			@ keep copy as future parent
 	cmp r3, $0			@ leaf?
-	ldrne r1, [r3, $16]		@ get key
-	ldrdne r2, r3, [r3]		@ get children
+	ldrne r1, [r0, $16]		@ get key
+	ldrdne r2, r3, [r0]		@ get children
 	bne_fl
-@@@ --- TODO
-@@@ --- Create a address avalable in tree. A fifo queue
+_graft:	
+	/* r0 parent, r3 empty slot to put pointer to PID's addr, r4 PID's addr */
+	ldr r2, [r4, $12]		@ get hbslb slot
+	str r2, [r3]			@ str hbslb addr into branch
+g1:	
 	
-
+_set_root:
+	/* If hb_list is 'fresh' then first new p_entry grafted will
+	 * be root and head
+	 */
+	ldr r2, [r4, $12]		@ get hbslb alloted slot
+	str r2, [r5]			@ set root
+	str r2, [r5, $4}		@ set head (remember its a fresh list)
+	mov r0, 
+	b g1
 
 	.data
 	.align 2
@@ -114,6 +131,7 @@ P_entry:
 	.word 0		@ PID  --process ID
 	.word 0		@ PV   --priority val
 	.word 0		@ PSTATE {1 - 7?}
+	.word 0		@ hb_addr (Addr of 24 bytes slot to put on hb_list[n]
 		.rept 17	
 	.word 0			@ PREG  --saved registers {r0 - r15, cprs}
 		.endr
@@ -123,11 +141,10 @@ P_entry:
 		.endr
 
 	.align 3	@ align 3 to allow ldrd/strd
-hb_list0:
-	.word 0		@ root
-	.word 0		@ head
-	/* fruits */
-		.rept 20 @ Max number of process (can be changed later)
+	
+/* P_entry linked hb_list tree */
+hbslb:			@ hb_shared_linked_basket */
+		.rept 50
 	.word 0		@ * < child addr 
 	.word 0		@ * > child addr
 	.word 0		@ parent addr
@@ -135,17 +152,13 @@ hb_list0:
 	.word 0		@ KEY == PV
 	.word 0		@ 
 		.endr
+hb_list0:
+	.word 0		@ root
+	.word 0		@ head
+
 hb_list1:
 	.word 0		@ root
 	.word 0		@ head
-		.rept 20 @ Max number of process (can be changed later)
-	.word 0		@ * < node
-	.word 0		@ * > node
-	.word 0		@ parent addr
-	.word 0		@ pid addr
-	.word 0		@ KEY == PV
-	.word 0		@ 
-		.endr
 
 	.align 3	@ align 3 to allow ldrd/strd
 hb_cur_list:		@ current process list to 'pick' from
