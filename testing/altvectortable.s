@@ -7,6 +7,7 @@
 	 * time
 	*/
 
+	.include "macro.s"
 	.global _init
 	.global _start
 _start:	
@@ -22,7 +23,7 @@ _init:
 	ldr r2, _start
 	str r0, [r2]
 	b _start
-
+	DMB
 space_waste:
 	.rept 32
 	.word 0xff

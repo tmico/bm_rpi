@@ -91,7 +91,8 @@ $(BUILD)%.o: $(SOURCE)%.s $(BUILD)
 # ===========================================================
 $(KERNELGZ): $(IMAGE)
 ifneq ($(DEBUG),yes)
-	gzip -k -f $(IMAGE)
+	@#gzip -k -f $(IMAGE)
+	gzip -f -c $(IMAGE) > $(KERNELGZ) 
 endif
 
 $(UIMAGE): $(IMAGE)

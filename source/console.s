@@ -22,7 +22,7 @@ _tty_console_in: 				@-- change to better named label!
 	
 	stmfd sp!, {r4 - r7, lr}
 	mov r4, r0
-	mov r5, r1				@ preserve
+	mov r6, r1				@ preserve
 _get_free_buffer:	
 	ldr r0, =FreeBufList
 	bl _fdequeue
@@ -57,10 +57,10 @@ _put_in_ConsoleFifo:
 	cmp r5, $0				@ string completly copied?
 	bgt _get_free_buffer
 
-	ldr r3, =TtyLock
-	mov r2, $0
-	str r2, [r3]
-	mcr p15, 0, r2, c7, c10, 5		@ DMB
+	ldr r2, =TtyLock
+	mov r3, $0
+	str r3, [r2]
+	mcr p15, 0, r3, c7, c10, 5		@ DMB
 	ldmfd sp!, {r4 - r7, pc}
 
 @===============================================================================

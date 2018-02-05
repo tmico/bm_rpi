@@ -1,3 +1,4 @@
+	.include "macro.h"
 	.section .init				@ initialize this section first
 	b _reset
 @ =============================================
@@ -51,6 +52,7 @@ ex:
 	ldr r0, =TstLock
 	mov r1, $0
 	str r1, [r0]				@ Attempt to free it
+	DMB
 	b _Bloop
 	
 	ldr r0, =RebootMsg
