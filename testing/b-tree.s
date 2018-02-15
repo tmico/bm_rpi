@@ -5,6 +5,11 @@
  * by far the hardest will be to add/remove and rebalance tree
  */
 
+	.global _pick_tree
+	.global _graft_new_fruit
+	.global _getpid
+	.global _create_p	@-- TODO
+	.global _destroy_p	@-- TODO
 	.text
 	.align 2
 _pick_tree:
@@ -146,8 +151,20 @@ _init_root:
 	str r2, [r5, $4]		@ set head (remember its a fresh list)
 	b gl				@ gl zero's children
 
+_getpid:
+	/* returns the pid of current process */
+	ldr r3, =CURPID
+	ldr r2, [r3]
+	ldr r0, [r2]
+	bx lr
+
+
 	.data
 	.align 2
+
+/* CURPID: Current pid address */
+CURPID:
+	.word 0		@ addr of cur pid
 
 /* Process Table Entry */
 P_entry:

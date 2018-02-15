@@ -38,10 +38,11 @@
  * 0x20200000 + 28
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  */
 
+.include "../include/sys.S"
 
 	.global _get_gpio_adr
 _get_gpio_adr:				@ get address funtion
-	ldr r3, =0x20200000
+	ldr r3, =GPIOBASE
 	bx lr
 
 
@@ -57,7 +58,7 @@ _set_gpio_func:
 	push {r4-r5, lr}
 	mov r4, #7			@ a mask set even if r1 is 0 so that
 					@ we can << to correct loction to clear
-	ldr r3, =0x20200000		@ branching would waste 6 cycles
+	ldr r3, =GPIOBASE
 _funtionLoop$:				@ to get correct address
 	cmp r0, #9			@ div by 10 using sub. the quotient
 	subhi r0, r0, #10		@ holds the GPSEL of the pin we want
@@ -94,8 +95,8 @@ _set_gpio:
 	bxhi lr
 	push {r4-r6, lr}
 	cmp r1, #0			@ GPOSET or GPOCLR? 
-	ldreq r4, = 0x20200028		@ GPOCLR0 address
-	ldrne r4, = 0x2020001c		@ GPOSET0 address
+	ldreq r4, = GPIOCLR0		@ GPOCLR0 address
+	ldrne r4, = GPIOSET0		@ GPOSET0 address
 	cmp r0, #31			@ GPOxxx0 or GPOxxx1?
 	subhi r0, r0, #32
 	addhi r4, r4, #4		@ GPOxxx1 address if r0 > 31

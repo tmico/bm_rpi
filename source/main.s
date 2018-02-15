@@ -1,4 +1,4 @@
-	.include "macro.h"
+	.include "../include/macro.S"
 	.section .init				@ initialize this section first
 	b _reset
 @ =============================================

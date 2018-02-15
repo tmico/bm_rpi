@@ -77,6 +77,7 @@ ud:
 _swi:
 	stmfd sp!, {r0 - r12, lr}	 	@ unlike IRQ/FIQ lr is pc +4 
 	clrex
+
 	/* GOING to print to contents of all the registers inc spsr - 
 		for degbuging reasons */
 	/*
@@ -84,7 +85,6 @@ _swi:
 	bic r0, r0, $(1<<7)			@ re-enable interupts
 	bic r0, r0, $(1<<6)			@ re-enable fiq
 	msr cpsr, r0
-	*/
 
 	ldr r4, =SysCall
 	ldr r5, [r4, r7, lsl $2]		@ r7 syscall a la linux
@@ -95,7 +95,9 @@ _swi:
 	orr r0, r0, $(1<<6)			@ disable fiq
 	msr cpsr, r0
 	str r2, [r0]				@ clear lock
-ldmfd sp!, {r0-r12, pc}^		@ return from svr/swi
+	*/
+	@--- return early. unfinished code 
+	ldmfd sp!, {r0-r12, pc}^		@ return from svr/swi
 
 	.global _pre_abort
 _pre_abort:
@@ -281,11 +283,4 @@ ReservedLable:
 	.asciz "Reserved"
 Abort:
 	.asciz "PC is %x\nlr is %x\n"
-
-
-
-
-
-
-
 
