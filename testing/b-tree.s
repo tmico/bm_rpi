@@ -109,6 +109,7 @@ fl:					@ find leaf
 	cmp r1, r6
 	mov r0, r2			@ keep copy as future parent
 	movmi r3, r2
+	mov r0, r3			@ keep copy as future parent
 	cmp r3, $0			@ leaf?
 	ldrne r1, [r0, $16]		@ get key
 	ldrned r2, r3, [r0]		@ get children
@@ -171,7 +172,11 @@ P_entry:
 	.word 0		@ PID  --process ID
 	.word 0		@ PV   --priority val
 	.word 0		@ PSTATE {1 - 7?}
+<<<<<<< HEAD
 	.word 0		@ hb_addr (Addr of 24 bytes slot to put on hbslb
+=======
+	.word 0		@ hb_addr (Addr of 24 bytes slot to put on hb_list[n]
+>>>>>>> 9b24e1d77a32dfd46c4c13273bae47fc4c23f6f0
 		.rept 17	
 	.word 0		@ PREG  --saved registers {r0 - r15, cprs}
 		.endr
