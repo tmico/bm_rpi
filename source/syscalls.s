@@ -38,10 +38,11 @@ FdTable:
 	.global SysCall
 SysCall:
 	
-	 .word 0                                @ sys_restart
-	 .word 0                                @ sys_exit
-	 .word 0                                @ sys_fork
-	 .word 0                                @ sys_read
-	 .word _sys_write                       @ sys_write
-	 .word 0				@ sys_open
-	 .word 0				@ sys_close
+	.word 0					@ sys_restart
+	.word 0					@ sys_exit
+	.word 0					@ sys_fork
+	.word 0					@ sys_read
+	.word _sys_write			@ sys_write
+	.word 0					@ sys_open
+	.word 0					@ sys_close
+	
