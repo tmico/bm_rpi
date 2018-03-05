@@ -16,7 +16,7 @@ _fenqueue:
 	 *	.int pointer to head
 	 *	.int pointer to tail (points to nxt available slot
 	 *	.int fifo size (bytes) of buffer array. 
-	 *	.byte x size buffer
+	 *	.int size buffer
 	 */
 	
 	stmfd sp!, {r4 - r6, lr}

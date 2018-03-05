@@ -12,6 +12,7 @@
 	.global _destroy_p	@-- TODO
 	.text
 	.align 2
+@------------------------------------------------
 _pick_tree:
 	/* pick_tree picks the key from the tree. Head always points to lowest
 	 * value fruit (key) and is a leaf
@@ -78,6 +79,7 @@ _find_lsr_leaf:
 	ldmfd sp!, {r4 - r5}
 	bx lr
 
+@------------------------------------------------
 _swap_btree:
 	/* swap <current> and <next> list round */
 	ldr r12, =hb_cur_list
@@ -86,6 +88,7 @@ _swap_btree:
 	str r1, [r12]
 	bx lr
 
+@------------------------------------------------
 _graft_new_fruit:
 	/* insert new fruit (key) into b-tree. If graft is > than root then
 	 * rotate left is performed to make <greater than child> of root the
@@ -125,14 +128,14 @@ g1:
 	str r3, [r2, $4]
 	
 _balance_tree:
-	@-- if PID PV greater than root PV then rotate left
+	/*if PID PV greater than root PV then rotate left*/
 	cmp r12, r6			@ r12 == root_key, r6 == graft_key
 	bpl _exit_graft
 
 	ldr r3, [r5]			@ ldr root from (r5 == hb_list{x})
 	ldr r1 [r3, $4]			@ ldr root > child
 	mov r2, $0
-	@-- r1 will be new root, r3 lesser child to root.
+	/*r1 will be new root, r3 lesser child to root.*/
 	ldr r0, [r1]			@ r0 == r1 < child, will become r3 > child
 	str r3, [r1]			@ r3 bcomes r1 < child
 	str r1, [r3, $8]		@ r1 becomes r3 parent
@@ -152,6 +155,7 @@ _init_root:
 	str r2, [r5, $4]		@ set head (remember its a fresh list)
 	b gl				@ gl zero's children
 
+@------------------------------------------------
 _getpid:
 	/* returns the pid of current process */
 	ldr r3, =CURPID
@@ -160,6 +164,7 @@ _getpid:
 	bx lr
 
 
+@------------------------------------------------
 	.data
 	.align 2
 
