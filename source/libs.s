@@ -406,3 +406,57 @@ BOLength= .-BufferOverflow
 	  
 
 
+	.global _strcpy
+	.text
+	.align 2
+_strcpy:	
+	/* Copy at most n (r2) charactors from source (r1) to destination (r0)
+	   The may or may not be null terminated
+	   Returns: r0 = Destination addr
+		    r1 = last byte to be copied
+	*/
+	ldrb r3, [r1]
+	mov r12, r0
+	subs r2, r2, $1
+	beq _exit0
+_stcp:	
+	strb r3, [r0], $1
+	subs r2, r2, $1
+	ldrb r3, [r1, $1]!
+	bhi _stcp
+	b _exit0
+
+	.global strncpy
+_strncpy:
+	/* Copy at most n (r2) charactors from source (r1) to destination (r0)
+	   Pad with '\0' if source has less than n charactors
+	   The may or may not be null terminated
+	   Returns: r0 = Destination addr
+		    r1 = last byte to be copied
+	*/
+	ldrb r3, [r1]
+	mov r12, r0
+	subs r2, r2, $1
+	beq _exit0
+_stncp:	
+	cmp r3, $0
+	beq _pad
+	strb r3, [r0], $1
+	subs r2, r2, $1
+	ldrb r3, [r1, $1]!
+	bhi _stncp
+
+_exit0:
+	strb r3, [r0]
+	mov r1, r3				@ return last byte of string
+	mov r0, r12				@ and dest addr
+	bx lr	
+_pad:
+	mov r3, $0
+_p1:
+	strb r3, [r0], $1
+	subs r2, r2, $1
+	ldrb r3, [r1, $1]!
+	bhi _p1
+	b _exit0
+

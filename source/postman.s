@@ -58,10 +58,11 @@
 	The receiver confirms the message is for the correct mailbox, 
 							and tries again if not.
 */
+.include "../include/sys.S"
 
 	.global _mailbox_write
 _mailbox_write:
-	ldr r3, =0x2000B880			@ base address
+	ldr r3, =MAILBASE
 
 	tst r0, #15				@ tst = (AND -> cmp 0)
 	bxne lr					@ This block tests if values
@@ -79,7 +80,7 @@ _chkStatusWrite$:				@ 1=full 0=empty
 
 	.global _mailbox_read
 _mailbox_read:
-	ldr r3, =0x2000B880			@ base address
+	ldr r3, =MAILREAD			@ base address
 	cmp r0, #15				@ check valid channel
 	bxhi lr
 

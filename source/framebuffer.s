@@ -4,9 +4,10 @@
 	and the framebuffer at offset #32 will contain the pointer for the GPU
 	any other value is a failure. 
  * The GPU's main memory starts at address 0x40000000. To negotiate with
-   the GPU without clearing its (l2) cach any address used must be added
+   the GPU without clearing its (l2) cache any address used must be added
    to 0x40000000 */
 
+.include "../include/sys.S"
 	
 	.section .data
 .global FramebufferInfo
@@ -37,7 +38,7 @@ _init_framebuffer:
 	blne _Bchk_value
 	
 	/* Adjust for GPU mem adr (0x40000000) and send to mailbox ch1*/
-	add r0, r3, $0x40000000
+	add r0, r3, $GPUADDR
 	mov r1, $1
 	bl _mailbox_write
 

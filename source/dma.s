@@ -79,6 +79,7 @@
 
 	[0-14]_NEXTCNBK		31:0	Addr of next CB. Stop if 0x00000000
 ******************************************************************************/
+	.include "../include/sys.S"
 	.text
 	.global _clrscr_dma0
 	/* For time being _clrscr_dma0 is going to tranfer a buffer from mem to 
@@ -115,7 +116,7 @@ _clrscr_dma0:
 	str r1, [r0, #16]			@ dec src to start of SB
 
 	/* CONBLK_ADD */
-	ldr r1, =0x20007000			@ DMA channel 0 addr
+	ldr r1, =DMA0				@ DMA channel 0 addr
 	str r0, [r1, #4]			@ load CB
 
 	/* TI */
@@ -136,7 +137,7 @@ _clrl_dma0:
 	 * Input: R0 = address of Control Block with desired values stored
 	 * Output: N/A
 	 */ 
-	ldr r1, =0x20007000			@ DMA channel 0 addr
+	ldr r1, =DMA0				@ DMA channel 0 addr	
 	str r0, [r1, #4]			@ Str the CB
 	mov r2, $0x01
 	str r2, [r0]				@ Activate dma

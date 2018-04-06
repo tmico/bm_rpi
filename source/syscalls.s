@@ -1,6 +1,7 @@
 
 /* Syscalls - work in progress */
-
+	
+@@@ re-do! some thought needed to design some kind of basic fd table  
 	.text
 	.align 2
 
@@ -8,50 +9,40 @@
 	/* Input: r0 = fd, r1 = &STRING, r2 = SIZE (bytes (inc NULL byte))
 	 */
 _sys_write:
-	cmp r0, $1				@ fd 1 = StdOut
-	mov r11, lr				@ preserve lr
-	blne _get_fd
-	cmp r2, $0x1000				@ if > than max then...
-	ldrhs r2, =$0x999			@ ...set string length to max
-	
-_get_lock:	
-	ldr r6, =LockStdOut
-	ldrex r3, [r6]
-	mov r4, $1
-	cmp r3, $0
-	strexeq r3, r4, [r6]
-	cmpeq r3, $0
-	bne _get_lock
-	
-	ldrb r5, [r1], $1			@ move string to StdOut buffer
-	ldr r7, =StdOut
-_ms:
-	subs r2, r2, $1
-	strneb r5, [r7], $1
-	ldrneb r5, [r1], $1
-	bne _ms
-	mov r5, $0
-	strb r5, [r7], $1
-	mov lr, r11
-	bx lr
-	
+	stmfd sp!, {lr}
+/* -- placeholder -- */
+	stmfd sp!, {r0 - r12, lr}
+	ldr r0, =RegContent
+	ldr r1, =SwiLable
+	mrs r2, spsr
+	mov r3, sp
+	bl _kprint
+	mov r0, r1
+	bl _uart_ctr
+	ldmfd sp!, {r0 - r12, lr}
+
+	ldmfd sp!, {pc}
 	
 _get_fd:	
 	/*ToDo setup a proper file descriptor table */
-	bx lr					@ FD not implimented yet so return...
-						@ ...safely
+	
+	ldr r0, =FdTable
+	ldr r3, [r0]
+	bx lr	
+		
 	.data
 	.align 2
-	
-	.global LockStdOut
-LockStdOut:					@ mutex for StdOut
-	.int 0
-
-	/* jump/switch table for syscalls */
+FdTable:
+	.word _tty_console_in
+	/* jump/switch table for syscalls -- mimicking linux syscall.tbl */
 	.global SysCall
 SysCall:
 	
-	 .word 0                                 @ sys_read
-	 .word 0                                 @ sys_open
-	 .word 0                                 @ sys_close
-	 .word _sys_write                        @ sys_write
+	.word 0					@ sys_restart
+	.word 0					@ sys_exit
+	.word 0					@ sys_fork
+	.word 0					@ sys_read
+	.word _sys_write			@ sys_write
+	.word 0					@ sys_open
+	.word 0					@ sys_close
+	

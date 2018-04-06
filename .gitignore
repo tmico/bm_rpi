@@ -3,9 +3,11 @@
 *~
 *.patch
 *.gz
+source/.*.swp
 kernel.*
 kimage
 zimage
 uimage
 build/
+testing/
 
