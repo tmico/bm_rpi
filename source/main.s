@@ -1,12 +1,11 @@
 	.section .init				@ initialize this section first
+	.global _start
+
+_start:
 	b _reset
 
 /* ========= End of section init ========= */
-
 	.section .main
-
-	.global _start
-_start:
 	b _main
 
 	.global _main

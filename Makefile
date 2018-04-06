@@ -2,22 +2,30 @@
 #
 #	A makefile script for generation of raspberry pi kernel images.
 #
-#
 ###############################################################################
 
-# The compiler to use
+# ===========================================================
+# The compiler to use and flags 
+# ===========================================================
 ARMGNU ?= arm-none-eabi
 
 # ASFLAGS for debugging
 ASFLAGS = -g
 
-# The intermediate directory for compiled object files.
+
+# ===========================================================
+# The directories for source and compiled object files.
+# ===========================================================
 BUILD = build/
 
-# The directory in which source files are stored.
+BUILD_GDB = build_gdb/
+
 SOURCE = source/
 
+
+# ===========================================================
 # The name of the output files to generate.
+# ===========================================================
 KERNEL = kimage
 
 KERNELGZ = kimage.gz
@@ -26,37 +34,42 @@ UIMAGE = uimage
 
 ZIMAGE = zimage
 
-# The name of the assembler listing file to generate.
 LIST = kernel.list
 
-# The name of the map file to generate.
 MAP = kernel.map
 
-# The name of gdb friendly output file
-GDBELF = gdb.elf
+GDBELF = kgdb.elf
 
-# The name of the linker script to use.
 LINKER = kernel.ld
 
-# The names of all object files that must be generated. Deduced from the
-# assembly code files in source.
+
+# ===========================================================
+# Rules to make object files deduced from source files and
+# build kernel 
+# ===========================================================
 OBJECTS := $(patsubst $(SOURCE)%.s,$(BUILD)%.o,$(wildcard $(SOURCE)*.s))
 
 # Rule to make everything.
 all: $(KERNEL) $(LIST) $(UIMAGE) $(ZIMAGE)
 
-# Rule to remake everything. Does not include clean.
 rebuild: clean all
 
-# Rule to make the listing file.
 $(LIST): $(BUILD)kimage.elf
 	$(ARMGNU)-objdump -D $(BUILD)kimage.elf > $(LIST)
 
-# Rule to make the image file.
 $(KERNEL): $(BUILD)kimage.elf
-	$(ARMGNU)-objcopy $(BUILD)kimage.elf -O binary $(KERNEL)
+	$(ARMGNU)-objcopy --strip-debug $(BUILD)kimage.elf -O binary $(KERNEL)
 
-# Rule to make gzip'ed image
+$(BUILD)kimage.elf: $(OBJECTS)
+	$(ARMGNU)-ld --no-undefined $(OBJECTS) -Map $(MAP) -o $(BUILD)kimage.elf -T $(LINKER)
+
+$(BUILD)%.o: $(SOURCE)%.s $(BUILD)
+	$(ARMGNU)-as $(ASFLAGS) -I $(SOURCE) $< -o $@
+
+
+# ===========================================================
+# Rule to make gzip'ed and u-boot bootable image files
+# ===========================================================
 $(KERNELGZ): $(KERNEL)
 	gzip -k -f $(KERNEL)
 
@@ -68,22 +81,25 @@ $(ZIMAGE): $(KERNELGZ)
 	@ echo "Invoking mkimage to make an compressed image"
 	mkimage -A arm -T kernel -C gzip -a 0x8000 -e 0x8000 -n "virus-0.0" -d $(KERNELGZ) $(ZIMAGE)
 
-# Rule to make the elf file.
-$(BUILD)kimage.elf: $(OBJECTS)
-	$(ARMGNU)-ld --no-undefined $(OBJECTS) -Map $(MAP) -o $(BUILD)kimage.elf -T $(LINKER)
 
-# Rule to make gdb friendly file.
-$(GDBELF): $(OBJECTS_GDB)
-	$(ARMGNU)-ld $(OBJECTS_GDB) -o $(BUILD_GDB)$(GDBELF) -T $(LINKER)
+# ============================================================
+# Rules to create kgdb.elf
+# ============================================================
+OBJ := $(patsubst $(SOURCE)%.s,$(BUILD_GDB)%.o,$(wildcard $(SOURCE)*.s))
 
-# Rule to make the object files.
-$(BUILD)%.o: $(SOURCE)%.s $(BUILD)
-	$(ARMGNU)-as -I $(SOURCE) $< -o $@
+debug: $(GDBELF)
 
-# Rule to make debug object files
 $(BUILD_GDB)%.o: $(SOURCE)%.s $(BUILD_GDB)
-	$(ARMGNU)-as $(ASFLAGS) -I $(SOURCE) $< -o $@
+	as $(ASFLAGS) -I $(SOURCE) $< -o $@
 
+$(GDBELF): $(OBJ)
+	ld --no-undefined $(OBJ) -o $(GDBELF) 
+	objdump -D $(GDBELF) > $(GDBELF).list
+
+
+#============================================================
+# Rules to make directories and what to delete when cleaning
+# ===========================================================
 $(BUILD):
 	mkdir $@
 
@@ -93,9 +109,12 @@ $(BUILD_GDB):
 # Rule to clean files.
 clean:
 	-rm -rf $(BUILD)
+	-rm -rf $(BUILD_GDB)
 	-rm -f $(KERNEL)
 	-rm -f $(LIST)
 	-rm -f $(MAP)
 	-rm -f $(KERNELGZ)
 	-rm -f $(UIMAGE)
 	-rm -f $(ZIMAGE)
+	-rm -f $(GDBELF)
+	-rm -f $(GDBELF).list
