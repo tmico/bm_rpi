@@ -131,8 +131,3 @@ _strmv:
 	mov r0, $0				@ return value
 	b _exit
 
-	/*
-	 * dqueue : dqueue group of funtions work on doubly linked queues.
-	 * no assumption is made about memmory alignment of queue being operated
-	 * on, or its size
-	 */
