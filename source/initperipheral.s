@@ -73,6 +73,7 @@ _create_vt:
 	str r1, [r0, $0x224]
 	mov r1, $0
 	str r1, [r0, $0x20c]			@ disable all FIQ
+
 	/* arm timer */
 	ldr r1, [r0, $0x218]			@ Only concerned with timer at this time
 	orr r1, r1, $0x1
@@ -80,6 +81,7 @@ _create_vt:
 	ldr r2, =_arm_timer_interupt		@ loading loc of label
 	ldr r3, =IrqHandler
 	str r2, [r3, $380]			@ timer handler has 95*4 offset
+
 	/*  ---End of enable interupts--- */
 
 	/* Turn on green led to inform user system is on */

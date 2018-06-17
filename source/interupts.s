@@ -61,48 +61,49 @@ _reset:
 	.endif
 	b _start
 
+/*===============================================
+ * Undefined
+ *=============================================*/
 	.global _undefined
 _undefined:
+	stmfd sp!, {r0 - r12, lr}
 	ldr r0, =RegContent
-	mrs r1, spsr
-	sub r2, lr, $4				@ when the excepton happend
-	ldr r3, =UndefinedLable
+	ldr r1, =UndefinedLable
+	mrs r2, spsr
+	sub r3, lr, $4				@ when the excepton happend
 	bl _kprint
 	mov r0, r1
 	bl _uart_ctr
 ud:
 	b ud
 
+/*===============================================
+ * SVR/SWI --aka syscall handler
+ *=============================================*/
 	.global _swi
 _swi:
-	stmfd sp!, {r0 - r12, lr}	 	@ unlike IRQ/FIQ lr is pc +4 
-	clrex
-	/* GOING to print to contents of all the registers inc spsr - 
-		for degbuging reasons */
-	/*
-	mrs r0, cpsr
-	bic r0, r0, $(1<<7)			@ re-enable interupts
-	bic r0, r0, $(1<<6)			@ re-enable fiq
-	msr cpsr, r0
-	*/
+	srsfd sp!, $16				@ store return state in user
+	cpsie iaf, $16				@ change to usermode: enable...
+						@ ...interupts
+	stmfd sp!, {r0 - r12, lr}
 
 	ldr r4, =SysCall
 	ldr r5, [r4, r7, lsl $2]		@ r7 syscall a la linux
 	blx r5					@ branch to correct call
 	
-	mrs r0, cpsr
-	orr r0, r0, $(1<<7)			@ disable interupts
-	orr r0, r0, $(1<<6)			@ disable fiq
-	msr cpsr, r0
-	str r2, [r0]				@ clear lock
-ldmfd sp!, {r0-r12, pc}^		@ return from svr/swi
+	ldmfd sp!, {r0 - r12, lr}		@ prepare for return
+	rfefd sp!				@ return
 
+/*===============================================
+ * Pre Abort
+ *=============================================*/
 	.global _pre_abort
 _pre_abort:
+	ldmfd sp!, {r0 - r12, lr}
 	ldr r0, =RegContent
-	mrs r1, spsr
-	sub r2, lr, $4				@ when the excepton happend
-	ldr r3, =PreAbortLable
+	ldr r1, =PreAbortLable
+	mrs r2, spsr
+	sub r3, lr, $4				@ when the excepton happend
 	bl _kprint
 	mov r0, r1
 	bl _uart_ctr
@@ -116,24 +117,32 @@ _pre_abort:
 pa:
 	b pa
 
+/*===============================================
+ * SVR/SWI --aka syscall handler
+ *=============================================*/
 	.global _data_abort
 _data_abort:
-da:	
+	stmfd sp!, {r0 - r12, lr}
 	ldr r0, =RegContent
-	mrs r1, spsr
-	sub r2, lr, $4				@ when the excepton happend
-	ldr r3, =DataAbortLable
+	ldr r1, =DataAbortLable
+	mrs r2, spsr
+	sub r3, lr, $4				@ when the excepton happend
 	bl _kprint
 	mov r0, r1
 	bl _uart_ctr
+da:	
 	b da
 
+/*===============================================
+ * Reserved/Monitor
+ *=============================================*/
 	.global _reserved
 _reserved:
+	stmfd sp!, {r0 - r12, lr}
 	ldr r0, =RegContent
+	ldr r1, =ReservedLable
 	mrs r1, spsr
 	sub r2, lr, $4				@ when the excepton happend
-	ldr r3, =ReservedLable
 	bl _kprint
 	mov r0, r1
 	bl _uart_ctr
@@ -259,18 +268,20 @@ _arm_timer_interupt:
 
 .data
 .align 2
-
+	/* These 'global' here only to test syscall. To be deleted later */
+	.global RegContent
+	.global SwiLable
 LedOnOff:
 	.word	0x0
 A:
 	.asciz "A"
 	
 RegContent:
-	.ascii "\ncpsr: %x\npc_old: %x\nException: %s\nr12: %x\nr11: %x"
-	.ascii "\nr10: %x\nr9: %x\nr8: %x\nr7: %x\nr6: %x\nr5: %x\nr4: %x\nr3: %x\nr2: %x"
-	.asciz "\nr1: %x\nr0: %x\n"
+	.ascii "\nException: %s\ncpsr: %x\nsp: %x\nr0: %x\nr1: %x"
+	.ascii "\nr2: %x\nr3: %x\nr4: %x\nr5: %x\nr6: %x\nr7: %x\nr8: %x\nr9: %x\nr10: %x"
+	.asciz "\nr11: %x\nr12: %x\nlr: %x\n"
 SwiLable:
-	.asciz "SRV/SWI"
+	.asciz "SVR/SWI"
 PreAbortLable:
 	.asciz "Pre Abort"
 DataAbortLable:
@@ -281,11 +292,4 @@ ReservedLable:
 	.asciz "Reserved"
 Abort:
 	.asciz "PC is %x\nlr is %x\n"
-
-
-
-
-
-
-
 

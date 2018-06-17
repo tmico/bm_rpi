@@ -1,15 +1,14 @@
-	.include "macro.h"
+	.include "../include/macro.S"
 	.section .init				@ initialize this section first
+	.global _start
+
+_start:
 	b _reset
 @ =============================================
 @ End of section init 
 @ Section main
 @ =============================================
-
 	.section .main
-
-	.global _start
-_start:
 	b _main
 
 	.global _main
@@ -48,17 +47,20 @@ ex:
 	strexeq r2, r1, [r0]			@ Attempt to lock it
 	cmp r2, $0				@ 0 = success, 1 = fail
 	bne ex
+@-- test syscall 
+	mov r7, $4				@ 4 = sys_write
 	svc 0
 	ldr r0, =TstLock
 	mov r1, $0
 	str r1, [r0]				@ Attempt to free it
 	DMB
-	b _Bloop
+	@--b _Bloop
 	
 	ldr r0, =RebootMsg
 	bl _kprint
 	mov r0, r1
 	bl _uart_ctr
+	b _Bloop	@--only here to test we got here!!!
 	b _reboot_system
 
 @ Delay routine
