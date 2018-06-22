@@ -3,6 +3,9 @@
 /* Bellow are the handlers for each exception, obviously unfinshed!!!*/
 
 	.global _reset
+/*===============================================
+ * reset
+ *=============================================*/
 _reset:
 
 	.if DEBUG == 1				@ If debug sym is set then we
@@ -174,6 +177,9 @@ rsrvd:
 	pending_2 starts at offset #32 + [bit position] (IRQ 32-63)
 	basic pending starts at offset #64 + [bit position] (IRQ 64-71)
 */
+/*===============================================
+ * IRQ
+ *=============================================*/
 	.global _irq_interupt
 _irq_interupt:		
 
@@ -182,9 +188,9 @@ _irq_interupt:
 	stmfd sp!, {r0-r12, lr}	
 	clrex
 
-	mov r0, $0x20000000			@ basic pending register
-	add r0, r0, $0xb200
-	ldr r8, [r0]
+	mov r11, $0x20000000			@ basic pending register
+	add r11, r11, $0xb200
+	ldr r8, [r11]
 	ldr r7, =IrqHandler
 _irq_source:
 	mov r6, $64
