@@ -1,3 +1,4 @@
+	.include "../include/macro.S"
 	.section .interupts
 	.align 2
 /* Bellow are the handlers for each exception, obviously unfinshed!!!*/
@@ -13,9 +14,6 @@ _reset:
 						@ ...various exception modes
 						@ ...to allow gdb debugging
 	.else
-	/* Ensure we are in supervisor mode */
-	mov r0, $0x13
-	msr cpsr_c, r0
 
 	/* Set up the stack pointers for different cpu modes */
 	mov r0, $0x11			@ Enter FIQ mode
@@ -62,7 +60,8 @@ _reset:
 	mov sp, $0x8000
 
 	.endif
-	b _start
+@--	b _start
+	b _main
 
 /*===============================================
  * Undefined
@@ -85,13 +84,16 @@ ud:
  *=============================================*/
 	.global _swi
 _swi:
+	DMB
+	clrex
 	srsfd sp!, $16				@ store return state in user
 	cpsie iaf, $16				@ change to usermode: enable...
 						@ ...interupts
 	stmfd sp!, {r0 - r12, lr}
 
 	ldr r4, =SysCall
-	ldr r5, [r4, r7, lsl $2]		@ r7 syscall a la linux
+	mov r7, r7, lsl $2			@ shift to get word offset
+	ldr r5, [r4, r7]			@ r7 syscall a la linux
 	blx r5					@ branch to correct call
 	
 	ldmfd sp!, {r0 - r12, lr}		@ prepare for return
@@ -121,7 +123,7 @@ pa:
 	b pa
 
 /*===============================================
- * SVR/SWI --aka syscall handler
+ * Data Abort
  *=============================================*/
 	.global _data_abort
 _data_abort:

@@ -10,18 +10,11 @@
 	 */
 _sys_write:
 	stmfd sp!, {lr}
-/* -- placeholder -- */
-	stmfd sp!, {r0 - r12, lr}
-	ldr r0, =RegContent
-	ldr r1, =SwiLable
-	mrs r2, spsr
-	mov r3, sp
-	bl _kprint
 	mov r0, r1
+	mov r1, r2
 	bl _uart_ctr
-	ldmfd sp!, {r0 - r12, lr}
-
 	ldmfd sp!, {pc}
+
 	
 _get_fd:	
 	/*ToDo setup a proper file descriptor table */
@@ -46,3 +39,5 @@ SysCall:
 	.word 0					@ sys_open
 	.word 0					@ sys_close
 	
+Swrite:		@ For debugging 
+	.asciz "This is syscall write\n"
