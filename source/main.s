@@ -11,7 +11,6 @@ _start:
 	.section .main
 	.global _main
 _main:
-	b ex
 	/* routine to on the screen fabienne's pic*/
 _L0:
 	ldr r10, = FabPic
@@ -54,12 +53,11 @@ ex:
 	str r1, [r0]				@ Attempt to free lock
 	DMB
 	
-	/* === move 'Bloop' to where to bring to a close ===*/
 	nop
+	/* === move 'Bloop' to where to bring to a close ===*/
 	b _Bloop
 	/* =================================================*/
 
-	b _reboot_system
 
 _Bloop:						
 	nop
@@ -72,10 +70,15 @@ _error$:
 
 	b _Bloop
 
-	.data
-	.align 2
 TstLock:
 	.word 0
+
+
+@==============================================
+@ Random Data
+@==============================================
+	.data
+	.align 2
 
 RebootMsg:
 	.asciz "The Pi Zero is rebooting"
@@ -84,28 +87,3 @@ RandomMsg:
 	.asciz "Hello this is a random message.\nIf you can read this then it probably means it works (of sorts!)\n"
 RandomMsgLgth =.-RandomMsg	
 
-
-/*=========================================================
- * Old code not brought myself to delete yet as i may change my mind
- * and want to use it
- *=========================================================
- */
-
-_reloc_exeption_image:
-	.word 0xe59ff018		@ = ldr pc, [pc, #24]
-	.word 0xe59ff018
-	.word 0xe59ff018
-	.word 0xe59ff018
-	.word 0xe59ff018
-	.word 0xe59ff018
-	.word 0xe59ff018
-	.word 0xe59ff018
-
-	.word _reset
-	.word _undefined
-	.word _swi
-	.word _pre_abort
-	.word _data_abort
-	.word _reserved
-	.word _irq_interupt
-	.word _fiq_interupt
