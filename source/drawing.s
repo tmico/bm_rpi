@@ -1,39 +1,3 @@
-/* drawing.s holds these functions:
- *	_fg_colour : gets and stores  pixel color value at address FgColour
-
- *	_get_graphics_adr :  gets the address of the frambuffer pointer and 
-				stores it at address GraphicsAdr
-
- *	_set_pixel16: sends to the memory address of FB the pixel colour value
-		to be 'printed'.  
-		recieves in r0 X axis value and in r1 the Y axis value.
-		Co-ordinates (0,0) is top left of the screen. The values in r0
-		and r1, are first checked against the width and height of the
-		virtual screen loaded from address gotton from _get_graphics_adr
-		the address offset for virtual width and hieght is #8 and #12
-		respectfully. (see framebuffer.s)
-		The memmory address for the pixel to set is its bit value long. 
-		memory of _set_pixel = (virtual_width x Y) + X x nbytes 
-		nbytes is the number of bytes used to store the colour. 16bit
-		colour then has a value of 2bytes. X and Y start from 0
-
- *	_set_pixel: is for 24bit colours. It performs same function as above
-		Coordinates of the pixel is calculated the same way where
-		'nbytes' would be 3 rather than 2 as in 16bit colour. Being
-		24bits or 3 bytes the memory locations are NOT word aligned
-		it is therefor easier to write the individual 'r' 'g' 'b' 
-		byte components that make up the colour at the address
-		calculate + respective rgb_channel (0 red; 1 green; 2 blue)
-		so for example we have colour value 0x00ffaa22
-		in 16bit order the 'ff' is the red; 'aa' the green; '22' the blue
-		supose we want to write this 24bit colour at address
-		'GraphicsAdr+coordinate'; then we write the blue value {22} to 
-		'GraphicsAdr+coordinate' + 2
-		the green value {aa} to 'GraphicsAdr+coordinate' + 1
-		the red value {ff} to 'GraphicsAdr+coordinate' + 0
-
-============================================================================*/
-
 	.section .data
 	.align 2
 	.global FgColour
@@ -61,6 +25,9 @@ _graphics_adr:
 	str r0, [r1]
 	bx lr
 
+/*_set_pixel24: sends to the memory address of FB the pixel colour value
+ * In: r0 X axis value, r1 the Y axis value.
+ */
 	.global _set_pixel24
 _set_pixel24:
 	stmfd sp!, {r4-r5, lr}			@ push
@@ -84,6 +51,9 @@ _set_pixel24:
 
 	ldmfd sp!, {r4-r5, pc}			@ pop and exit
 
+/*_set_pixel32: sends to the memory address of FB the pixel colour value
+ * In: r0 X axis value, r1 the Y axis value.
+ */
 	.global _set_pixel32
 _set_pixel32:
 	ldr r12, =FramebufferInfo		@ check that x and y are valid
@@ -102,6 +72,9 @@ _set_pixel32:
 
 	bx lr
 
+/*_set_pixel16: sends to the memory address of FB the pixel colour value
+ * In: r0 X axis value, r1 the Y axis value.
+ */
 	.global _set_pixel16
 _set_pixel16:
 	ldr r3, =FramebufferInfo		@ original code that only 

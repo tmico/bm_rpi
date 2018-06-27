@@ -107,23 +107,6 @@ _boot_seq:
 	mov lr, r11
 	bx lr
 
-/*
-	Instruction table to load into memory 0x00
-	The kernel is loaded to mem loc 0x8000. The arm system jumps to these
-	addresses when there is an exception:
-	0x00 : reset
-	0x04 : undifined instruction
-	0x08 : software interupt (svr)
-	0x0c : pre abort
-	0x10 : data abort
-	0x14 : reserverd
-	0x18 : IRQ
-	0x1c : FIQ
-	The insruction table is used to put the correct branch instructions 
-	(ie, if there is an interupt, the intruction at 0x18 will be
-	[b <_interupt_handler_lable>] or [ldr pc, =_irq_interupt])
-	into the correct memory location
-*/
 hfs:
 	.asciz "Graphics address: %x\n"
 Text1:	

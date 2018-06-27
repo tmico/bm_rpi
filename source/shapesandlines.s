@@ -1,43 +1,4 @@
-/* Bresenhams's Allgorithm for staight lines
- * Designed in 60's to draw a straight line on digital plotters, but has 
-   found wide spread usage in computer graphics as it is fast, using interger
-   only (can use float but why would you want to?)
- * The algorithm is:
-		delta_x = xi-x1			
-		delta_y = yi-y1
-		k = 0
-		p_k = 2delta_y - delta_x
-		plot (x1,y1)
-		for x < xi: 
-			if p_k < 0:
-				plot (x_k +1, y_k)
-				p_k = p_k + 2delta_y
-			else:
-				plot (x_k +1, y_k +1)
-				p_k = p_k + 2delta_y - 2delta_x
-			x = x +1:
-
- * The algorithm only computes for the first octant of a circle however, but
-   it is trivial to adapt and ammend depending on conditions tested for, to have
-   it working for any octant.
-	delta_[x,y] in the algorithm needs to be positive but a simple conditional 
-	RSB from zero will convert to the two's compliment. eg -2 becomes 2.
-
-	x is the driving axis. The driving axis needs to be the larger of the
-	two axis. CMP delta_x, delta_y can be used to determine the driving axis
-	or if the line is a perfect 45", horizontal or vertical in which case
-	the algorithm can be skiped for a much simpler stepping instruction if 
-	thought the gain in speed is worth it considering the frequency it will
-	be used is very low.
-*/
-
-/* _draw_line([x,y],[xi,yi]) takes four arguments that are the xy coordinates
-	for the point of origin of the line to its end point. [x,y] start point
-	[xi,yi] end point.
-	As it ierates over the algorithm it will call _set_pixel32() to display
-	the line as each pixel coordinate is calculated
-	
-*/
+/* Bresenhams's Allgorithm for staight lines*/
 
 	.text
 	.global _draw_line

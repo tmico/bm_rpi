@@ -1,7 +1,6 @@
 	.include "../include/macro.S"
 	.section .interupts
 	.align 2
-/* Bellow are the handlers for each exception, obviously unfinshed!!!*/
 
 	.global _reset
 /*===============================================
@@ -187,31 +186,6 @@ _reserved:
 rsrvd:	
 	b rsrvd
 
-/* IRQ. The PI has NO interupt vector module. It has 3 pending registers with
-   some IRQ from pending_1 and pending_2 also duplicated in pending_basic. Bits
-   8 and 9 in pending_basic are not IRQ's but status bits to inform if there 
-   are any IRQ's pending in pending_1 and/or pending_2 set. The 'duplicates'
-   are NOT tacken into account for these 2 status bits.
-	bit 8 - pending_1
-	bit 9 - pending_2
-   Bits 8 and 9 are thus 'There are more interupts in other register[s]'
- * Based on suggestion in BCM2835 manual pg 111 with amendments
-   to speed things up. sequence is 1) test for bits 8 and 9
-   and branch if only bit 8 or 9 is set to mask off duplicates
-   2) process which irq has triggerd, set branching address
-   3) branch to requestor and clear flag.
-   4) when back re-test in remote event that 2 or more irq'a
-   were triggered at the same time 	
- * The branching address holds the address to branch to using blx. 
-   The address is a little convaluted. Each IRQ has its own handling address 
-	which is:
-	IrqHandler (base address) + IRQ number
-	IRQ number is same as found in BCM2835 manual. And worked out by adding
-	the bit position to the offset of its pending register so:
-	pending_1 starts at offset #0 + [bit position] (IRQ 1-31)
-	pending_2 starts at offset #32 + [bit position] (IRQ 32-63)
-	basic pending starts at offset #64 + [bit position] (IRQ 64-71)
-*/
 /*===============================================
  * IRQ
  *=============================================*/
@@ -274,12 +248,7 @@ _fiq_interupt:
 	b _fiq_interupt
 
 
-/* IRQ handlers. 
-initial idea is routines wishing to use interupts need to place pointers
-in mem using this funtion which in turn will handle clearing source and do
-other stuff im not sure what less explain it!!!
- thinking r0 will be IRQ number r1 will, be pc of where to branch to 
-TO DO !!!	*/
+/* IRQ handlers. */
 	
 	.global _arm_timer_interupt
 _arm_timer_interupt:	
@@ -304,18 +273,17 @@ _arm_timer_interupt:
 /* =========== End of interupt service routines ====== */
 
 
+@=====================================================
+@ Most of data bellow is just here to help debugging and
+@ will be cut at some time
+@=====================================================
 .data
 .align 2
-	/* These 'global' here only to test exceptions To be deleted later */
 	.global RegContent
 	.global SwiLable
 LedOnOff:
 	.word	0x0
 
-@=====================================================
-@ Most of data bellow is just here to help debugging and
-@ will be cut at some time
-@=====================================================
 
 	.global A
 A:
