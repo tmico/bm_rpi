@@ -83,8 +83,8 @@ _boot_seq:
 	ldr r0, =Text1
 	bl _kprint				@ kprint will put it in StOut
 	ldr r0, =VirusAscii
-@--	bl _kprint				@ kprint unable to handle > then 1024
-	bl _uart_ctr
+	bl _puts				@ kprint unable to handle > then 1024
+@--	bl _uart_ctr
 
 	/* getting framebuffer address to send via uart */
 	bl _graphics_adr

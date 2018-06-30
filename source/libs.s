@@ -2,27 +2,23 @@
 	.align 2
 	.global _kprint
 
-/*_kprint:
-	Input:	r0 string address
-		r1 - r3 interger, character (ascii), address of string (pointer)
-		stack additional args (int, char, string address)
-	Output: r0 0 success; -1 failure
-	@--	r1 StdOut
+/*---------------------------------------------------
+ * _kprint: A mini printf function
+ *	Input:	r0 string address
+ *		r1 - r3 interger, character (ascii), address of string (pointer)
+ *		stack additional args (int, char, string address)
+ *	Output: r0 &string
+ --------------------------------------------------*/
 
-	_kprint funtion - converts values for printing according to args given
-	and converts to ascii and calls syscall write to print to stdout 
-	_kprint is a variadic function.
-	place holder	Meaning
-		%c	single char
-		%d	decimal int
-		%b	binary int
-		%f	float  ---> not yet implemented
-		%s	string
-		%x	hexadecimal
-		%u	unsigned
-		%l	long (64 bit)
+		/*%c	single char*/
+		/*%d	decimal int*/
+		/*%b	binary int*/
+		/*%f	float  ---> not yet implemented*/
+		/*%s	string*/
+		/*%x	hexadecimal*/
+		/*%u	unsigned*/
+		/*%l	long (64 bit)*/
 
-*/
 _kprint:	
 	stmfd sp!, {r3}				@ str args for easy access
 	stmfd sp!, {r2}				@ str args for easy access
@@ -46,13 +42,13 @@ _parse:
 	bne _parse
 	b _str_end
 
-
 _forsp:
 	ldrb r4, [r6], $1
 	ldr r0, =Jumptable
 	mov r9, $0				@ deleting stale values
 	mov r8, $0				@ deleting stale values
 	mov r1, $10				@ convert from binary to bcd
+
 	/* This looks terrible and there's probably a better way but brain dead!
 	   chunk of code checks char after the '%' placeholder to assertain if
 	   width (0 or space) is required. problem lies that ascii numbers are
@@ -169,8 +165,6 @@ _S0:
 	bcc _parse
 	b _str_end
 
-
-
 _char:
 	subs r7, r7, $1
 	beq _str_end
@@ -181,8 +175,7 @@ _char:
 _float:	@ doubtfull it would be of any use but usefull excercise to impliment
 _hex:
 	b _bin_asciihex
-	/* r7 = remaining space in StdOut, r8 = width, r9 = leading char, eg 002
-	*/
+	/* r7 = remaining space on stack, r8 = width, r9 = leading char, eg 002 */
 _ins_var:
 	subs r3, r8, r1				@ fsp_width v actual number width
 	subhi r7, r7, r3
@@ -213,23 +206,19 @@ _str_end:
 	
 	movgt r0, $0
 	mvnle r0, $0
-	rsbgt r2, r7, $1024
-	ldrle r2, =BOLength
+	rsbgt r1, r7, $1024
+	ldrle r1, =BOLength
+@--	rsbgt r2, r7, $1024
+@--	ldrle r2, =BOLength
 /*EXIT*/
+@--	movgt r1, sp
+@--	ldrle r1, =BufferOverflow
+	add r0, sp, $32
+	bl _puts				@ puts calls syscall write
 	ldmfd sp!, {r4 - r10, lr}		@ return
-	movgt r1, sp
-	ldrle r1, =BufferOverflow
 	add sp, sp, $1024
 	add sp, sp, $0xc			@ adjust sp back 1036bytes
-	/* Put in a system call to write() here */
-	mov r0, $1
-@-- 	mov r1, $STRING_ADDRESS
-@-- 	mov r2, $STRING_SIZE
-	mov r7, $4				@4 syscall for write
-	svc 0
 	bx lr
-
-
 	
 _bin_asciihex:
 	/* binary to hex in assci converter. Converts value in r0 to hex
@@ -378,7 +367,7 @@ _h5c:
 _h5s:
 	.ascii "%s"
 
-	.DATA
+	.data
 	.align 2
 BinHexTable:
 	.byte '0'
@@ -403,11 +392,24 @@ BufferOverflow:
 	.asciz "Max string length reached"
 BOLength= .-BufferOverflow
 	  
+	.text
+	.align 2
+	.global _puts
+/*------------------------------------------------
+ * puts: prints a string to stdout
+ *	input; r0 = &string
+ -----------------------------------------------*/
+_puts:
+	stmfd sp!, {r7, lr}
+	mov r2, r1
+	mov r1, r0
+	mov r0, $1
+	mov r7, $4
+	svc 0
+	ldmfd sp!, {r7, pc}
 
 
 	.global _strcpy
-	.text
-	.align 2
 _strcpy:	
 	/* Copy at most n (r2) charactors from source (r1) to destination (r0)
 	   The may or may not be null terminated
