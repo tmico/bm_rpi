@@ -1,6 +1,6 @@
+	.include "../include/macro.S"
 	.section .interupts
 	.align 2
-/* Bellow are the handlers for each exception, obviously unfinshed!!!*/
 
 	.global _reset
 /*===============================================
@@ -13,56 +13,67 @@ _reset:
 						@ ...various exception modes
 						@ ...to allow gdb debugging
 	.else
-	/* Ensure we are in supervisor mode */
-	mov r0, $0x13
-	msr cpsr_c, r0
 
+	/* Populate the vector table with intruction to branch to correct
+	 * exception routine
+	 */
+@--	add r1, pc, $20
+	ldr r1, =_vt
+	mov r0, $0x0
+	ldmia r1!, {r4 - r11} 
+	stmia r0!, {r4 - r11}
+	ldmia r1!, {r4 - r11} 
+	stmia r0!, {r4 - r11}
+	b _sp
+_vt:
+	ldr pc, [pc, $0x18] 			@ = ldr pc, [pc, #24]
+	ldr pc, [pc, $0x18]			@ these are the instruction that
+	ldr pc, [pc, $0x18]			@ need to populate the first 32 bytes
+	ldr pc, [pc, $0x18]			@ of memory; the vector table
+	ldr pc, [pc, $0x18]
+	ldr pc, [pc, $0x18]
+	ldr pc, [pc, $0x18]
+	ldr pc, [pc, $0x18]
+ExceptionMemLoc:
+	.word _reset
+	.word _undefined
+	.word _swi
+	.word _pre_abort
+	.word _data_abort
+	.word _reserved
+	.word _irq_interupt
+	.word _fiq_interupt
+
+_sp:
 	/* Set up the stack pointers for different cpu modes */
-	mov r0, $0x11			@ Enter FIQ mode
-	msr cpsr, r0			@ ensure irq and fiq are disabled
-	mrs r0, cpsr
-	orr r0, r0, $0xc0
-	msr cpsr, r0
+	cpsid iaf, $0x1f		@ Enter System mode
+	mov sp, $0x8000			@ set up its stack pointer
+
+	cpsid iaf, $0x11		@ Enter FIQ mode
 	mov sp, $0x3000			@ set its stack pointer
 
-	mov r0, $0x12			@ Enter IRQ mode
-	msr cpsr, r0			@ ensure irq and fiq are disabled
-	mrs r0, cpsr
-	orr r0, r0, $0xc0
-	msr cpsr, r0
+	cpsid iaf, $0x12		@ Enter IRQ mode
 	mov sp, $0x5000			@ set its stack pointer
 
-	mov r0, $0x13			@ Enter SWI mode
-	msr cpsr, r0			@ ensure irq and fiq are disabled
-	mrs r0, cpsr
-	orr r0, r0, $0xc0
-	msr cpsr, r0
+	cpsid iaf, $0x13		@ Enter SWI mode
 	mov sp, $0x4000			@ set its stack pointer
 
+
+	cpsid iaf, $0x17		@ Enter Abort mode
+	mov sp, $0x3000			@ set its stack pointer
+
+	cpsid iaf, $0x1b		@ Enter Undefined mode
+	mov sp, $0x3000			@ set its stack pointer
+
+	cpsie iaf, $0x1f		@ Enter System mode interupts enabled
+@--	mov sp, $0x8000			@ set its stack pointer
+
 	/* inititalize peripheral hardware such as uart, gpu framebuffer, 
-	 * timer etc while in supervisor mode */
+	 * timer etc while in privileged mode */
 	bl _boot_seq
 
-	mov r0, $0x17			@ Enter ABORT mode
-	msr cpsr, r0			@ ensure irq and fiq are disabled
-	mrs r0, cpsr
-	orr r0, r0, $0xc0
-	msr cpsr, r0
-	mov sp, $0x3000			@ set its stack pointer
-
-	mov r0, $0x1b			@ Enter UNDEFINED mode
-	msr cpsr, r0			@ ensure irq and fiq are disabled
-	mrs r0, cpsr
-	orr r0, r0, $0xc0
-	msr cpsr, r0
-	mov sp, $0x3000			@ set its stack pointer
-
-	mov r0, $0x10
-	msr cpsr, r0			@ User mode | fiq/irq enabled
-	mov sp, $0x8000
-
 	.endif
-	b _start
+	b _main
 
 /*===============================================
  * Undefined
@@ -85,17 +96,30 @@ ud:
  *=============================================*/
 	.global _swi
 _swi:
-	srsfd sp!, $16				@ store return state in user
-	cpsie iaf, $16				@ change to usermode: enable...
-						@ ...interupts
+	DMB
+	clrex
+	srsfd sp!, $0x1f			@ store return state in system
+	cpsie iaf, $0x1f			@ ...mode and change to it and
+						@ ...re enable interupts
 	stmfd sp!, {r0 - r12, lr}
 
+	ldr r5, =Systablesize
 	ldr r4, =SysCall
-	ldr r5, [r4, r7, lsl $2]		@ r7 syscall a la linux
+	mov r7, r7, lsl $2			@ shift to get word offset
+	cmp r5, r7
+	bmi _invalid
+
+	ldr r5, [r4, r7]			@ r7 syscall a la linux
 	blx r5					@ branch to correct call
 	
 	ldmfd sp!, {r0 - r12, lr}		@ prepare for return
 	rfefd sp!				@ return
+
+	/* if syscall number out of bounds enter data abort */
+_invalid:
+	mov r0, $0x17				@ Enter ABORT mode
+	msr cpsr, r0				@ ensure irq and fiq are disabled
+	b _data_abort
 
 /*===============================================
  * Pre Abort
@@ -121,7 +145,7 @@ pa:
 	b pa
 
 /*===============================================
- * SVR/SWI --aka syscall handler
+ * Data Abort
  *=============================================*/
 	.global _data_abort
 _data_abort:
@@ -129,7 +153,7 @@ _data_abort:
 	ldr r0, =RegContent
 	ldr r1, =DataAbortLable
 	mrs r2, spsr
-	sub r3, lr, $4				@ when the excepton happend
+	sub r3, lr, $8				@ when the excepton happend
 	bl _kprint
 	mov r0, r1
 	bl _uart_ctr
@@ -152,84 +176,57 @@ _reserved:
 rsrvd:	
 	b rsrvd
 
-/* IRQ. The PI has NO interupt vector module. It has 3 pending registers with
-   some IRQ from pending_1 and pending_2 also duplicated in pending_basic. Bits
-   8 and 9 in pending_basic are not IRQ's but status bits to inform if there 
-   are any IRQ's pending in pending_1 and/or pending_2 set. The 'duplicates'
-   are NOT tacken into account for these 2 status bits.
-	bit 8 - pending_1
-	bit 9 - pending_2
-   Bits 8 and 9 are thus 'There are more interupts in other register[s]'
- * Based on suggestion in BCM2835 manual pg 111 with amendments
-   to speed things up. sequence is 1) test for bits 8 and 9
-   and branch if only bit 8 or 9 is set to mask off duplicates
-   2) process which irq has triggerd, set branching address
-   3) branch to requestor and clear flag.
-   4) when back re-test in remote event that 2 or more irq'a
-   were triggered at the same time 	
- * The branching address holds the address to branch to using blx. 
-   The address is a little convaluted. Each IRQ has its own handling address 
-	which is:
-	IrqHandler (base address) + IRQ number
-	IRQ number is same as found in BCM2835 manual. And worked out by adding
-	the bit position to the offset of its pending register so:
-	pending_1 starts at offset #0 + [bit position] (IRQ 1-31)
-	pending_2 starts at offset #32 + [bit position] (IRQ 32-63)
-	basic pending starts at offset #64 + [bit position] (IRQ 64-71)
-*/
 /*===============================================
  * IRQ
  *=============================================*/
 	.global _irq_interupt
 _irq_interupt:		
-
-	sub lr, lr, $4		@ pc -> lr when interupt occurs which is $4
-				@  higher than instruction we want to return to
-	stmfd sp!, {r0-r12, lr}	
+	@====== new code ======================
+	DMB 
 	clrex
+ 	sub lr, lr, $4		@ lr is pc when irq occurs which is 4 higher
+	stmfd sp!, {r0 - r12, lr}
 
-	mov r11, $0x20000000			@ basic pending register
-	add r11, r11, $0xb200
-	ldr r8, [r11]
-	ldr r7, =IrqHandler
-_irq_source:
-	mov r6, $64
-	and r9, r8, $0x300			@ If pending_1/2 has IRQ save it
-	bics r10, r8, $0x300			@ mask off and test bits 8,9
-	beq _tst_bit89
-_irq_bit:
-	/* source of irq in r10	*/
-	clz r1, r10				@ preserve r10 for testing 
-	add r8, r6, r1				@  r1 is scratch
-	ldr r0, [r7, r8, lsl $2]		@ r8*4 = offset 
-	mov r8, $(1<<31)
-	bic r10, r10, r8, lsr r1
-	blx r0		
-	cmp r10, $0
-	bne _irq_bit
-	tst r9, $0x100				@ something in pending_1?
-	bne _bit8
-	tst r9, $0x200
-	bne _bit9				@ something in pending_2?
-	ldmfd sp!, {r0-r12, pc}^		@ return from interrupt
-_tst_bit89:
-	teq r9, $0x100
-	bne _bit9
-_bit8:	
-	ldr r10, [r11, $4]
-	mov r6, $0
-	bic r9, r9, $0x100			@ clear bit 8 if set
-	bic r10, r10, $(13<<7)			@ clear duplicate interupts
-	bic r10, r10, $(3<<18)			@  also set in basic	
-	beq _irq_bit
-_bit9:
-	ldr r10, [r11, $8]
-	moveq r6, $32				@ r6 + bit position = irq no
-	bic r9, r9, $0x200
-	bic r10, r10, $(31<<21)			@ clear duplicate interupts
-	bic r10, r10, $(1<<30)			@	also set in basic
-	bal _irq_bit
+	mov r4, $0x20000000
+	add r4, r4, $0xb200		@ r12 = &basic_pending
+	ldr r7, [r4, $4]		@ r7 = pending_1
+	ldr r8, [r4, $8]		@ r8 = pending_2
+	ldr r6, [r4]			@ r6 = pending_0
+	ldr r5, =IrqHandler
+	/* priority order: pending_1, pending_2, pending_0 */
+_pend1:
+	bic r7, r7, $(13 << 7)
+	bics r7, r7, $(3 << 18)		@ clr duplicate bits
+	beq _pend2
+	clz r10, r7
+	mov r9, $0
+_irq1:
+	add r0, r9, r10, lsl $2
+	ldr lr, [r5, r0]		@ lr = irq handler routine
+	blx lr				@ jump to service irq
 
+	/* need to reload and retest in event of another interupt occuring
+	 * whilst servicing previous int - bits in pending reg can still be
+	 * set despite irq bit disabled in cpsr
+	 */
+	ldrd r6, r7, [r4]		@ r0 = pending_0, r1 = pending_1
+	ldr r8, [r4, $8]		@ r2 = pending_2
+	b _pend1
+_pend2:
+	bic r7, r8, $(31 << 21)
+	bics r7, r7, $(1 << 30)		@ clr duplicates
+	mov r9, $32
+	clz r10, r7
+	bne _irq1
+_pend0:
+	bics r7, r6, $0x300		@ clr and tst if any pending
+	clz r10, r7
+	mov r9, $256			@ 64 * 4
+	bne _irq1
+	/* return from exception */
+	ldmfd sp!, {r0 - r12, pc}^
+
+	@=======================================================
 	.global IrqHandler
 
 IrqHandler:			@ 96 irq handlers pointers
@@ -242,16 +239,12 @@ _fiq_interupt:
 	b _fiq_interupt
 
 
-/* IRQ handlers. 
-initial idea is routines wishing to use interupts need to place pointers
-in mem using this funtion which in turn will handle clearing source and do
-other stuff im not sure what less explain it!!!
- thinking r0 will be IRQ number r1 will, be pc of where to branch to 
-TO DO !!!	*/
+/* IRQ handlers. */
 	
 	.global _arm_timer_interupt
 _arm_timer_interupt:	
 	/* First clear the pending interupt */
+	stmfd sp!, {r0 - r12, lr}
 	mov r2, $0x20000000			@ timer base addr = 0x2000b40c
 	add r2, r2, $0xb000
 	mov r5, $1
@@ -259,28 +252,36 @@ _arm_timer_interupt:
 	ldr r3, =LedOnOff
 	ldr r1, [r3]
 	mov r0, $16
-	mov r4, lr				@ preserv lr
 	eor r1, r1, $1
 	str r1, [r3]
 	bl _set_gpio
-	ldr r0, =A
-	bl _uart_ctr
-	bx r4
+
+	/* here for debugging */
+	ldr r0, =B
+	bl _kprint
+
+	ldmfd sp!, {r0 - r12, pc}
 
 /* =========== End of interupt service routines ====== */
 
-/* SVR/SWI Handlers
-*/
 
+@=====================================================
+@ Most of data bellow is just here to help debugging and
+@ will be cut at some time
+@=====================================================
 .data
 .align 2
-	/* These 'global' here only to test syscall. To be deleted later */
 	.global RegContent
 	.global SwiLable
 LedOnOff:
 	.word	0x0
+
+
+	.global A
 A:
-	.asciz "A"
+	.asciz "IRQ"
+B:
+	.asciz "ARM_TIMER "
 	
 RegContent:
 	.ascii "\nException: %s\ncpsr: %x\nsp: %x\nr0: %x\nr1: %x"

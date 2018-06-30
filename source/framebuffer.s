@@ -1,12 +1,3 @@
-/*_init_framebuffer :- Function to negotiate an address with the GPU to use
-	The function describes the FB using the data held in the 
-	FramebufferInfo memmory address. If successful the GPU returns a zero
-	and the framebuffer at offset #32 will contain the pointer for the GPU
-	any other value is a failure. 
- * The GPU's main memory starts at address 0x40000000. To negotiate with
-   the GPU without clearing its (l2) cache any address used must be added
-   to 0x40000000 */
-
 .include "../include/sys.S"
 	
 	.section .data

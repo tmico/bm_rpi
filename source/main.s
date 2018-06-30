@@ -4,17 +4,14 @@
 
 _start:
 	b _reset
-@ =============================================
+@=============================================
 @ End of section init 
 @ Section main
-@ =============================================
+@=============================================
 	.section .main
-	b _main
-
 	.global _main
 _main:
-
-	/* routine to move around the screen fabienne's pic*/
+	/* routine to on the screen fabienne's pic*/
 _L0:
 	ldr r10, = FabPic
 	ldrd r8, r9, [r10, $0x10]		@ 0x10 - dimentions of pic ...
@@ -35,57 +32,38 @@ _L1:
 @ Testing Code 
 @==============================================
 
-@testing transfer speeds between dma & cpu
-	@bl _test_speeds
-@	nop
-@ testing stuff
 ex:	
-	ldr r0, =TstLock
+	/* example of how to use exclusive locks */
+	ldr r3, =TstLock
 	mov r1, $1
-	ldrex r2, [r0]
+	ldrex r2, [r3]
 	cmp r2, $0				@ free?
-	strexeq r2, r1, [r0]			@ Attempt to lock it
-	cmp r2, $0				@ 0 = success, 1 = fail
+	strexeq r2, r1, [r3]			@ Attempt to lock it
+	cmpeq r2, $0				@ 0 = success, 1 = fail
 	bne ex
-@-- test syscall 
+	
+	/* test syscall write (only prints to uart for time being) */
+	ldr r1, =RandomMsg
+	ldr r2, =RandomMsgLgth
 	mov r7, $4				@ 4 = sys_write
+	mov r0, $1
 	svc 0
 	ldr r0, =TstLock
 	mov r1, $0
-	str r1, [r0]				@ Attempt to free it
+	str r1, [r0]				@ Attempt to free lock
 	DMB
-	@--b _Bloop
 	
-	ldr r0, =RebootMsg
-	bl _kprint
-	mov r0, r1
-	bl _uart_ctr
-	b _Bloop	@--only here to test we got here!!!
-	b _reboot_system
+	ldr r1, =A
+	mov r0, $1
+	mov r7, $4
+	svc 0
 
-@ Delay routine
-_delay:
-	mov r0, $0x4000
-_d1:
-	subs r0, r0, $1
-	bne _d1
-	sub lr, lr, $12  @ dirty hack to test stuff
-	bx lr
+	nop
+	/* === move 'Bloop' to where to bring to a close ===*/
+	b _Bloop
+	/* =================================================*/
 
-	/* dma transfer to clear screen */
-/*	
-	ldr r5, =SysTimer
-_1:
-	ldr r12, [r5]
-	cmp r12, $0x08
-	bmi _1	
-	bl _clrscr_dma0				@ clear screen
-	eor r12, r12
-	str r12, [r5]
 
-	
-	b _L1
-*/
 _Bloop:						
 	nop
 	b _Bloop	@ Catch all loop
@@ -97,33 +75,20 @@ _error$:
 
 	b _Bloop
 
+TstLock:
+	.word 0
+
+
+@==============================================
+@ Random Data
+@==============================================
 	.data
 	.align 2
+
 RebootMsg:
 	.asciz "The Pi Zero is rebooting"
 
-TstLock:
-	.int 0
+RandomMsg:
+	.asciz "Hello this is a random message.\nIf you can read this then it probably means it works (of sorts!)\n"
+RandomMsgLgth =.-RandomMsg	
 
-	/* Old code not brought myself to delete yet as i may change my mind
-	 * and want to use it
-	 */
-
-_reloc_exeption_image:
-	.word 0xe59ff018		@ = ldr pc, [pc, #24]
-	.word 0xe59ff018
-	.word 0xe59ff018
-	.word 0xe59ff018
-	.word 0xe59ff018
-	.word 0xe59ff018
-	.word 0xe59ff018
-	.word 0xe59ff018
-
-	.word _reset
-	.word _undefined
-	.word _swi
-	.word _pre_abort
-	.word _data_abort
-	.word _reserved
-	.word _irq_interupt
-	.word _fiq_interupt

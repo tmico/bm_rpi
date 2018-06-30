@@ -7,10 +7,10 @@
 		r1 - r3 interger, character (ascii), address of string (pointer)
 		stack additional args (int, char, string address)
 	Output: r0 0 success; -1 failure
-		r1 StdOut
+	@--	r1 StdOut
 
 	_kprint funtion - converts values for printing according to args given
-	and converts to ascii and stores in StdOut (Max size of StdOut is 1024 char)
+	and converts to ascii and calls syscall write to print to stdout 
 	_kprint is a variadic function.
 	place holder	Meaning
 		%c	single char
@@ -221,13 +221,12 @@ _str_end:
 	ldrle r1, =BufferOverflow
 	add sp, sp, $1024
 	add sp, sp, $0xc			@ adjust sp back 1036bytes
-	/* Could put in a system call to write() here 
-	mov r0, $FILE_DESCRIPTER	;1 for stdout
-	mov r1, $STRING_ADDRESS
-	mov r2, $STRING_SIZE
-	mov r7, $4			;4 syscall for write (copied from linux)
+	/* Put in a system call to write() here */
+	mov r0, $1
+@-- 	mov r1, $STRING_ADDRESS
+@-- 	mov r2, $STRING_SIZE
+	mov r7, $4				@4 syscall for write
 	svc 0
-	*/
 	bx lr
 
 

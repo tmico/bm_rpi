@@ -14,7 +14,7 @@
 	ldr r8, [r4, $8]		@ r2 = pending_2
 	ldr r5, =IrqHandler
 	/* priority order: pending_1, pending_2, pending_0 */
-_irq0:
+_pend1:
 	bic r7, r7, $(13 << 7)
 	bics r7, r7, $(3 << 18)		@ clr duplicate bits
 	beq _pend2
@@ -31,7 +31,7 @@ _irq1:
 	 */
 	ldrd r6, r7, [r4]		@ r0 = pending_0, r1 = pending_1
 	ldr r8, [r4, $8]		@ r2 = pending_2
-	b _irq0
+	b _pend1
 _pend2:
 	bic r7, r8, $(31 << 21)
 	bics r7, r7, $(1 << 30)		@ clr duplicates
