@@ -131,25 +131,3 @@ _strmv:
 	mov r0, $0				@ return value
 	b _exit
 
-<<<<<<< HEAD
-/*
- * dqueue : dqueue group of funtions work on doubly linked list
- * items on list are 4 words (32bytes). 
- * Structure of list:
- *	--------------
- *	head	.word
- *	tail	.word
- *	--------------
- *	bp	.word
- *	key	.word
- *	addr/id	.word
- *	fp	.word
- *	--next item --
- */
-
-/*
- * en_dqueue: enter/add item to tail of list/queue
- * Input: r0 = base addr of list, r1 = item addr, r2 = key (MUST be 0 if none)
- */
-=======
->>>>>>> c93ead569787a3fe8296ac073fb590f71d08c4cd
