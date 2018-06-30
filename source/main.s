@@ -53,6 +53,11 @@ ex:
 	str r1, [r0]				@ Attempt to free lock
 	DMB
 	
+	ldr r1, =A
+	mov r0, $1
+	mov r7, $4
+	svc 0
+
 	nop
 	/* === move 'Bloop' to where to bring to a close ===*/
 	b _Bloop

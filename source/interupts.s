@@ -46,51 +46,31 @@ ExceptionMemLoc:
 
 _sp:
 	/* Set up the stack pointers for different cpu modes */
-	mov r0, $0x11			@ Enter FIQ mode
-	msr cpsr, r0			@ ensure irq and fiq are disabled
-	mrs r0, cpsr
-	orr r0, r0, $0xc0
-	msr cpsr, r0
+	cpsid iaf, $0x1f		@ Enter System mode
+	mov sp, $0x8000			@ set up its stack pointer
+
+	cpsid iaf, $0x11		@ Enter FIQ mode
 	mov sp, $0x3000			@ set its stack pointer
 
-	mov r0, $0x12			@ Enter IRQ mode
-	msr cpsr, r0			@ ensure irq and fiq are disabled
-	mrs r0, cpsr
-	orr r0, r0, $0xc0
-	msr cpsr, r0
+	cpsid iaf, $0x12		@ Enter IRQ mode
 	mov sp, $0x5000			@ set its stack pointer
 
-	mov r0, $0x13			@ Enter SWI mode
-	msr cpsr, r0			@ ensure irq and fiq are disabled
-	mrs r0, cpsr
-	orr r0, r0, $0xc0
-	msr cpsr, r0
+	cpsid iaf, $0x13		@ Enter SWI mode
 	mov sp, $0x4000			@ set its stack pointer
 
+
+	cpsid iaf, $0x17		@ Enter Abort mode
+	mov sp, $0x3000			@ set its stack pointer
+
+	cpsid iaf, $0x1b		@ Enter Undefined mode
+	mov sp, $0x3000			@ set its stack pointer
+
+	cpsie iaf, $0x1f		@ Enter System mode interupts enabled
+@--	mov sp, $0x8000			@ set its stack pointer
+
 	/* inititalize peripheral hardware such as uart, gpu framebuffer, 
-	 * timer etc while in supervisor mode */
+	 * timer etc while in privileged mode */
 	bl _boot_seq
-
-	mov r0, $0x17			@ Enter ABORT mode
-	msr cpsr, r0			@ ensure irq and fiq are disabled
-	mrs r0, cpsr
-	orr r0, r0, $0xc0
-	msr cpsr, r0
-	mov sp, $0x3000			@ set its stack pointer
-
-	mov r0, $0x1b			@ Enter UNDEFINED mode
-	msr cpsr, r0			@ ensure irq and fiq are disabled
-	mrs r0, cpsr
-	orr r0, r0, $0xc0
-	msr cpsr, r0
-	mov sp, $0x3000			@ set its stack pointer
-
-	mov r0, $0x10
-	msr cpsr, r0			@ User mode | fiq/irq enabled
-	mrs r0, cpsr
-	bic r0, r0, $0x80
-	mov sp, $0x8000
-	msr cpsr, r0
 
 	.endif
 	b _main
@@ -118,18 +98,28 @@ ud:
 _swi:
 	DMB
 	clrex
-	srsfd sp!, $16				@ store return state in user
-	cpsie iaf, $16				@ change to usermode: enable...
-						@ ...interupts
+	srsfd sp!, $0x1f			@ store return state in system
+	cpsie iaf, $0x1f			@ ...mode and change to it and
+						@ ...re enable interupts
 	stmfd sp!, {r0 - r12, lr}
 
+	ldr r5, =Systablesize
 	ldr r4, =SysCall
 	mov r7, r7, lsl $2			@ shift to get word offset
+	cmp r5, r7
+	bmi _invalid
+
 	ldr r5, [r4, r7]			@ r7 syscall a la linux
 	blx r5					@ branch to correct call
 	
 	ldmfd sp!, {r0 - r12, lr}		@ prepare for return
 	rfefd sp!				@ return
+
+	/* if syscall number out of bounds enter data abort */
+_invalid:
+	mov r0, $0x17				@ Enter ABORT mode
+	msr cpsr, r0				@ ensure irq and fiq are disabled
+	b _data_abort
 
 /*===============================================
  * Pre Abort
@@ -163,7 +153,7 @@ _data_abort:
 	ldr r0, =RegContent
 	ldr r1, =DataAbortLable
 	mrs r2, spsr
-	sub r3, lr, $4				@ when the excepton happend
+	sub r3, lr, $8				@ when the excepton happend
 	bl _kprint
 	mov r0, r1
 	bl _uart_ctr
@@ -196,6 +186,7 @@ _irq_interupt:
 	clrex
  	sub lr, lr, $4		@ lr is pc when irq occurs which is 4 higher
 	stmfd sp!, {r0 - r12, lr}
+
 	mov r4, $0x20000000
 	add r4, r4, $0xb200		@ r12 = &basic_pending
 	ldr r7, [r4, $4]		@ r7 = pending_1
@@ -253,7 +244,7 @@ _fiq_interupt:
 	.global _arm_timer_interupt
 _arm_timer_interupt:	
 	/* First clear the pending interupt */
-	stmfd sp!, {r4 - r12, lr}
+	stmfd sp!, {r0 - r12, lr}
 	mov r2, $0x20000000			@ timer base addr = 0x2000b40c
 	add r2, r2, $0xb000
 	mov r5, $1
@@ -265,10 +256,11 @@ _arm_timer_interupt:
 	str r1, [r3]
 	bl _set_gpio
 
+	/* here for debugging */
 	ldr r0, =B
-	bl _uart_ctr
+	bl _kprint
 
-	ldmfd sp!, {r4 - r12, pc}
+	ldmfd sp!, {r0 - r12, pc}
 
 /* =========== End of interupt service routines ====== */
 

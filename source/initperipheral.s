@@ -81,8 +81,9 @@ _boot_seq:
 
 	/* setup uart and send welcome text and ascii art logo*/
 	ldr r0, =Text1
-	bl _uart_ctr
+	bl _kprint				@ kprint will put it in StOut
 	ldr r0, =VirusAscii
+@--	bl _kprint				@ kprint unable to handle > then 1024
 	bl _uart_ctr
 
 	/* getting framebuffer address to send via uart */
@@ -91,9 +92,6 @@ _boot_seq:
 	ldr r1, [r3]				@ ldr the GPU adr
 	ldr r0, =hfs				@ ldr hex format specifier
 	bl _kprint				@ kprint will put it in StOut
-	cmp r0, $0
-	mov r0, r1
-	bleq _uart_ctr
 
 	/* set backgroung colour to black in frame buffer*/
 	mvn r0, $0xff000000
