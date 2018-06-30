@@ -43,11 +43,9 @@ ex:
 	bne ex
 	
 	/* test syscall write (only prints to uart for time being) */
-	ldr r1, =RandomMsg
-	ldr r2, =RandomMsgLgth
-	mov r7, $4				@ 4 = sys_write
-	mov r0, $1
-	svc 0
+	ldr r0, =RandomMsg
+	ldr r1, =RandomMsgLgth
+	bl _puts
 	ldr r0, =TstLock
 	mov r1, $0
 	str r1, [r0]				@ Attempt to free lock
