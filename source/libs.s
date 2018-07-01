@@ -204,10 +204,10 @@ _str_end:
 	strb r4, [r5]				@ ensure there is a NULL
 	cmp r7, $0				@ reason why here? (space or null byte)
 	
-	movgt r0, $0
-	mvnle r0, $0
+@--	movgt r0, $0
+@--	mvnle r0, $0
 	rsbgt r1, r7, $1024
-	ldrle r1, =BOLength
+@--	ldrle r1, =BOLength
 @--	rsbgt r2, r7, $1024
 @--	ldrle r2, =BOLength
 /*EXIT*/
