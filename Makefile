@@ -20,7 +20,8 @@ else
 endif
 
 # ===========================================================
-# The directories for source and compiled object files.
+# The directories for source and compiled object files and 
+# final boot images
 # ===========================================================
 BUILD = build/
 
@@ -28,6 +29,7 @@ BUILD_GDB = build_gdb/
 
 SOURCE = source/
 
+IMG_DIR = image/
 
 # ===========================================================
 # The name of the output files to generate.
@@ -61,8 +63,8 @@ LINKER = kernel.ld
 # ===========================================================
 # Rules to make object files deduced from source files and
 # build kernel 
-# If DEBUG=yes is passed to make, a gdb usable (but not 
-#  perfect) kernelgdb.elf image is built
+# If DEBUG=yes is passed to make, kernelgdb.elf image is built
+# GDB usable (but not perfect)
 # ===========================================================
 OBJECTS := $(patsubst $(SOURCE)%.s,$(BUILD)%.o,$(wildcard $(SOURCE)*.s))
 
@@ -74,8 +76,8 @@ $(LIST): $(BUILD)$(IMAGE_ELF)
 	$(ARMGNU)objdump -D $(BUILD)$(IMAGE_ELF) > $(LIST)
 
 
-$(IMAGE): $(BUILD)$(IMAGE_ELF)
-	$(ARMGNU)objcopy --strip-debug $(BUILD)$(IMAGE_ELF) -O binary $(IMAGE)
+$(IMAGE): $(BUILD)$(IMAGE_ELF) $(IMG_DIR)
+	$(ARMGNU)objcopy --strip-debug $(BUILD)$(IMAGE_ELF) -O binary $(IMG_DIR)$(IMAGE)
 
 
 $(BUILD)$(IMAGE_ELF): $(OBJECTS)
@@ -89,26 +91,27 @@ $(BUILD)%.o: $(SOURCE)%.s $(BUILD)
 # ===========================================================
 # Rule to make gzip'ed and u-boot bootable image files
 # ===========================================================
-$(KERNELGZ): $(IMAGE)
+$(KERNELGZ): $(IMG_DIR) $(IMAGE)
 ifneq ($(DEBUG),yes)
-	@#gzip -k -f $(IMAGE)
-	gzip -f -c $(IMAGE) > $(KERNELGZ) 
+	@#gzip -k -f $(IMG_DIR)$(IMAGE)
+	gzip -f -c $(IMG_DIR)$(IMAGE) > $(IMG_DIR)$(KERNELGZ) 
 endif
 
-$(UIMAGE): $(IMAGE)
+$(UIMAGE): $(IMG_DIR) $(IMAGE)
 ifneq ($(DEBUG),yes)
 	@ echo "Invoking mkimage to make an uncompressed image"
-	mkimage -A arm -T kernel -C none -a 0x8000 -e 0x8000 -n "virus-0.0" -d $(IMAGE)  $(UIMAGE)
+	mkimage -A arm -T kernel -C none -a 0x8000 -e 0x8000 -n "virus-0.0" -d $(IMG_DIR)$(IMAGE)  $(IMG_DIR)$(UIMAGE)
 endif
 
-$(ZIMAGE): $(KERNELGZ)
+$(ZIMAGE): $(IMG_DIR) $(KERNELGZ)
 ifneq ($(DEBUG),yes)
 	@ echo "Invoking mkimage to make an compressed image"
-	mkimage -A arm -T kernel -C gzip -a 0x8000 -e 0x8000 -n "virus-0.0" -d $(KERNELGZ) $(ZIMAGE)
+	mkimage -A arm -T kernel -C gzip -a 0x8000 -e 0x8000 -n "virus-0.0" -d $(IMG_DIR)$(KERNELGZ) $(IMG_DIR)$(ZIMAGE)
 endif
 
-#============================================================
-# Rules to make directories and what to delete when cleaning
+
+# ===========================================================
+# Rules to make directories
 # ===========================================================
 $(BUILD):
 	mkdir $@
@@ -116,16 +119,19 @@ $(BUILD):
 $(BUILD_GDB):
 	mkdir $@
 
+$(IMG_DIR):
+	mkdir $@
+
+
+# ===========================================================
 # Rule to clean files.
+# ===========================================================
 clean:
 	-rm -rf $(BUILD)
 	-rm -rf $(BUILD_GDB)
-	-rm -f $(KERNEL)
+	-rm -rf $(IMG_DIR)
 	-rm -f $(LIST)
 	-rm -f $(MAP)
-	-rm -f $(KERNELGZ)
-	-rm -f $(UIMAGE)
-	-rm -f $(ZIMAGE)
 	-rm -f $(GDBELF)
 	-rm -f $(GDBELF).list
 
